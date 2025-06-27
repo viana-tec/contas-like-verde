@@ -1,52 +1,77 @@
-
 import React from 'react';
 import { BarChart3, DollarSign, TrendingUp, AlertCircle, Calendar, PieChart, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar
-} from 'recharts';
-
-const monthlyData = [
-  { mes: 'Jul', pago: 18500, pendente: 12300 },
-  { mes: 'Ago', pago: 22100, pendente: 8900 },
-  { mes: 'Set', pago: 19800, pendente: 15600 },
-  { mes: 'Out', pago: 25300, pendente: 11200 },
-  { mes: 'Nov', pago: 21900, pendente: 9800 },
-  { mes: 'Dez', pago: 28700, pendente: 14100 }
-];
-
-const categoryData = [
-  { name: 'Utilities', value: 35, color: '#39FF14' },
-  { name: 'Aluguel', value: 25, color: '#00D9FF' },
-  { name: 'Materiais', value: 20, color: '#FF6B35' },
-  { name: 'Serviços', value: 15, color: '#FFD23F' },
-  { name: 'Outros', value: 5, color: '#FF3366' }
-];
-
-const weeklyPayments = [
-  { dia: 'Seg', valor: 3200 },
-  { dia: 'Ter', valor: 1800 },
-  { dia: 'Qua', valor: 4500 },
-  { dia: 'Qui', valor: 2900 },
-  { dia: 'Sex', valor: 5100 },
-  { dia: 'Sáb', valor: 1200 },
-  { dia: 'Dom', valor: 800 }
-];
-
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+const monthlyData = [{
+  mes: 'Jul',
+  pago: 18500,
+  pendente: 12300
+}, {
+  mes: 'Ago',
+  pago: 22100,
+  pendente: 8900
+}, {
+  mes: 'Set',
+  pago: 19800,
+  pendente: 15600
+}, {
+  mes: 'Out',
+  pago: 25300,
+  pendente: 11200
+}, {
+  mes: 'Nov',
+  pago: 21900,
+  pendente: 9800
+}, {
+  mes: 'Dez',
+  pago: 28700,
+  pendente: 14100
+}];
+const categoryData = [{
+  name: 'Utilities',
+  value: 35,
+  color: '#39FF14'
+}, {
+  name: 'Aluguel',
+  value: 25,
+  color: '#00D9FF'
+}, {
+  name: 'Materiais',
+  value: 20,
+  color: '#FF6B35'
+}, {
+  name: 'Serviços',
+  value: 15,
+  color: '#FFD23F'
+}, {
+  name: 'Outros',
+  value: 5,
+  color: '#FF3366'
+}];
+const weeklyPayments = [{
+  dia: 'Seg',
+  valor: 3200
+}, {
+  dia: 'Ter',
+  valor: 1800
+}, {
+  dia: 'Qua',
+  valor: 4500
+}, {
+  dia: 'Qui',
+  valor: 2900
+}, {
+  dia: 'Sex',
+  valor: 5100
+}, {
+  dia: 'Sáb',
+  valor: 1200
+}, {
+  dia: 'Dom',
+  valor: 800
+}];
 export const Dashboard: React.FC = () => {
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center space-x-3 mb-6">
         <BarChart3 className="h-8 w-8 text-[#39FF14]" />
         <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -99,7 +124,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Monthly Payments Line Chart */}
         <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold mb-4 flex items-center text-slate-50">
             <TrendingUp className="h-5 w-5 mr-2 text-[#39FF14]" />
             Pagamentos Mensais
           </h3>
@@ -108,68 +133,51 @@ export const Dashboard: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="mes" stroke="#9CA3AF" />
               <YAxis stroke="#9CA3AF" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '8px'
-                }}
-                formatter={(value) => [`R$ ${Number(value).toLocaleString()}`, '']}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="pago" 
-                stroke="#39FF14" 
-                strokeWidth={3}
-                name="Pago"
-                dot={{ fill: '#39FF14', strokeWidth: 2, r: 4 }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="pendente" 
-                stroke="#FF6B6B" 
-                strokeWidth={3}
-                name="Pendente"
-                dot={{ fill: '#FF6B6B', strokeWidth: 2, r: 4 }}
-              />
+              <Tooltip contentStyle={{
+              backgroundColor: '#1F2937',
+              border: '1px solid #374151',
+              borderRadius: '8px'
+            }} formatter={value => [`R$ ${Number(value).toLocaleString()}`, '']} />
+              <Line type="monotone" dataKey="pago" stroke="#39FF14" strokeWidth={3} name="Pago" dot={{
+              fill: '#39FF14',
+              strokeWidth: 2,
+              r: 4
+            }} />
+              <Line type="monotone" dataKey="pendente" stroke="#FF6B6B" strokeWidth={3} name="Pendente" dot={{
+              fill: '#FF6B6B',
+              strokeWidth: 2,
+              r: 4
+            }} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Category Distribution Pie Chart */}
         <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold mb-4 flex items-center text-slate-50">
             <PieChart className="h-5 w-5 mr-2 text-[#39FF14]" />
             Gastos por Categoria
           </h3>
           <ResponsiveContainer width="100%" height={300}>
             <RechartsPieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                dataKey="value"
-                label={({ name, value }) => `${name}: ${value}%`}
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
+              <Pie data={categoryData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({
+              name,
+              value
+            }) => `${name}: ${value}%`}>
+                {categoryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
               </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '8px'
-                }}
-              />
+              <Tooltip contentStyle={{
+              backgroundColor: '#1F2937',
+              border: '1px solid #374151',
+              borderRadius: '8px'
+            }} />
             </RechartsPieChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Weekly Payments Bar Chart */}
         <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
             <BarChart3 className="h-5 w-5 mr-2 text-[#39FF14]" />
             Pagamentos Semanais
           </h3>
@@ -178,14 +186,11 @@ export const Dashboard: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="dia" stroke="#9CA3AF" />
               <YAxis stroke="#9CA3AF" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  border: '1px solid #374151',
-                  borderRadius: '8px'
-                }}
-                formatter={(value) => [`R$ ${Number(value).toLocaleString()}`, 'Valor']}
-              />
+              <Tooltip contentStyle={{
+              backgroundColor: '#1F2937',
+              border: '1px solid #374151',
+              borderRadius: '8px'
+            }} formatter={value => [`R$ ${Number(value).toLocaleString()}`, 'Valor']} />
               <Bar dataKey="valor" fill="#39FF14" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -193,14 +198,14 @@ export const Dashboard: React.FC = () => {
 
         {/* Recent Activities */}
         <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
             <Users className="h-5 w-5 mr-2 text-[#39FF14]" />
             Atividades Recentes
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
               <div>
-                <p className="font-medium">Pagamento realizado</p>
+                <p className="font-medium text-zinc-50">Pagamento realizado</p>
                 <p className="text-sm text-gray-400">Energia Elétrica - CEMIG</p>
               </div>
               <div className="text-right">
@@ -211,7 +216,7 @@ export const Dashboard: React.FC = () => {
             
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
               <div>
-                <p className="font-medium">Nova conta cadastrada</p>
+                <p className="font-medium text-zinc-50">Nova conta cadastrada</p>
                 <p className="text-sm text-gray-400">Material de Escritório</p>
               </div>
               <div className="text-right">
@@ -222,7 +227,7 @@ export const Dashboard: React.FC = () => {
             
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
               <div>
-                <p className="font-medium">Boleto anexado</p>
+                <p className="font-medium text-zinc-50">Boleto anexado</p>
                 <p className="text-sm text-gray-400">Aluguel - Janeiro</p>
               </div>
               <div className="text-right">
@@ -236,7 +241,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Alerts Section */}
       <Card className="p-6 bg-gray-900 border-gray-800">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
           <AlertCircle className="h-5 w-5 mr-2 text-orange-400" />
           Alertas e Lembretes
         </h3>
@@ -260,6 +265,5 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </Card>
-    </div>
-  );
+    </div>;
 };

@@ -71,96 +71,97 @@ const weeklyPayments = [{
   valor: 800
 }];
 export const Dashboard: React.FC = () => {
-  return <div className="space-y-6">
-      <div className="flex items-center space-x-3 mb-6">
-        <BarChart3 className="h-8 w-8 text-[#39FF14]" />
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+  return <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+        <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-[#39FF14]" />
+        <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6 bg-gray-900 border-gray-800">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Total a Pagar</p>
-              <p className="text-2xl font-bold text-red-400">R$ 45.230,00</p>
+              <p className="text-xs sm:text-sm text-gray-400">Total a Pagar</p>
+              <p className="text-lg sm:text-2xl font-bold text-red-400">R$ 45.230,00</p>
             </div>
-            <DollarSign className="h-8 w-8 text-red-400" />
+            <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-red-400" />
           </div>
         </Card>
         
-        <Card className="p-6 bg-gray-900 border-gray-800">
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Total Pago</p>
-              <p className="text-2xl font-bold text-[#39FF14]">R$ 128.750,00</p>
+              <p className="text-xs sm:text-sm text-gray-400">Total Pago</p>
+              <p className="text-lg sm:text-2xl font-bold text-[#39FF14]">R$ 128.750,00</p>
             </div>
-            <TrendingUp className="h-8 w-8 text-[#39FF14]" />
+            <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-[#39FF14]" />
           </div>
         </Card>
         
-        <Card className="p-6 bg-gray-900 border-gray-800">
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Vencendo Hoje</p>
-              <p className="text-2xl font-bold text-orange-400">R$ 8.450,00</p>
+              <p className="text-xs sm:text-sm text-gray-400">Vencendo Hoje</p>
+              <p className="text-lg sm:text-2xl font-bold text-orange-400">R$ 8.450,00</p>
             </div>
-            <AlertCircle className="h-8 w-8 text-orange-400" />
+            <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" />
           </div>
         </Card>
         
-        <Card className="p-6 bg-gray-900 border-gray-800">
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Próx. 7 Dias</p>
-              <p className="text-2xl font-bold text-blue-400">R$ 23.890,00</p>
+              <p className="text-xs sm:text-sm text-gray-400">Próx. 7 Dias</p>
+              <p className="text-lg sm:text-2xl font-bold text-blue-400">R$ 23.890,00</p>
             </div>
-            <Calendar className="h-8 w-8 text-blue-400" />
+            <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
           </div>
         </Card>
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         {/* Monthly Payments Line Chart */}
-        <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center text-slate-50">
-            <TrendingUp className="h-5 w-5 mr-2 text-[#39FF14]" />
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
+          <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center text-slate-50">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-[#39FF14]" />
             Pagamentos Mensais
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="mes" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <XAxis dataKey="mes" stroke="#9CA3AF" fontSize={12} />
+              <YAxis stroke="#9CA3AF" fontSize={12} />
               <Tooltip contentStyle={{
               backgroundColor: '#1F2937',
               border: '1px solid #374151',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              fontSize: '14px'
             }} formatter={value => [`R$ ${Number(value).toLocaleString()}`, '']} />
-              <Line type="monotone" dataKey="pago" stroke="#39FF14" strokeWidth={3} name="Pago" dot={{
+              <Line type="monotone" dataKey="pago" stroke="#39FF14" strokeWidth={2} name="Pago" dot={{
               fill: '#39FF14',
               strokeWidth: 2,
-              r: 4
+              r: 3
             }} />
-              <Line type="monotone" dataKey="pendente" stroke="#FF6B6B" strokeWidth={3} name="Pendente" dot={{
+              <Line type="monotone" dataKey="pendente" stroke="#FF6B6B" strokeWidth={2} name="Pendente" dot={{
               fill: '#FF6B6B',
               strokeWidth: 2,
-              r: 4
+              r: 3
             }} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Category Distribution Pie Chart */}
-        <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center text-slate-50">
-            <PieChart className="h-5 w-5 mr-2 text-[#39FF14]" />
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
+          <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center text-slate-50">
+            <PieChart className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-[#39FF14]" />
             Gastos por Categoria
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <RechartsPieChart>
-              <Pie data={categoryData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({
+              <Pie data={categoryData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({
               name,
               value
             }) => `${name}: ${value}%`}>
@@ -169,27 +170,29 @@ export const Dashboard: React.FC = () => {
               <Tooltip contentStyle={{
               backgroundColor: '#1F2937',
               border: '1px solid #374151',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              fontSize: '14px'
             }} />
             </RechartsPieChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Weekly Payments Bar Chart */}
-        <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
-            <BarChart3 className="h-5 w-5 mr-2 text-[#39FF14]" />
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
+          <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center text-zinc-50">
+            <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-[#39FF14]" />
             Pagamentos Semanais
           </h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <BarChart data={weeklyPayments}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="dia" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <XAxis dataKey="dia" stroke="#9CA3AF" fontSize={12} />
+              <YAxis stroke="#9CA3AF" fontSize={12} />
               <Tooltip contentStyle={{
               backgroundColor: '#1F2937',
               border: '1px solid #374151',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              fontSize: '14px'
             }} formatter={value => [`R$ ${Number(value).toLocaleString()}`, 'Valor']} />
               <Bar dataKey="valor" fill="#39FF14" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -197,41 +200,41 @@ export const Dashboard: React.FC = () => {
         </Card>
 
         {/* Recent Activities */}
-        <Card className="p-6 bg-gray-900 border-gray-800">
-          <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
-            <Users className="h-5 w-5 mr-2 text-[#39FF14]" />
+        <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
+          <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center text-zinc-50">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-[#39FF14]" />
             Atividades Recentes
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div>
-                <p className="font-medium text-zinc-50">Pagamento realizado</p>
-                <p className="text-sm text-gray-400">Energia Elétrica - CEMIG</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-zinc-50 text-sm sm:text-base">Pagamento realizado</p>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">Energia Elétrica - CEMIG</p>
               </div>
-              <div className="text-right">
-                <p className="text-[#39FF14] font-bold">R$ 890,50</p>
+              <div className="text-right ml-2">
+                <p className="text-[#39FF14] font-bold text-sm sm:text-base">R$ 890,50</p>
                 <p className="text-xs text-gray-400">há 2 horas</p>
               </div>
             </div>
             
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div>
-                <p className="font-medium text-zinc-50">Nova conta cadastrada</p>
-                <p className="text-sm text-gray-400">Material de Escritório</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-zinc-50 text-sm sm:text-base">Nova conta cadastrada</p>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">Material de Escritório</p>
               </div>
-              <div className="text-right">
-                <p className="text-orange-400 font-bold">R$ 245,80</p>
+              <div className="text-right ml-2">
+                <p className="text-orange-400 font-bold text-sm sm:text-base">R$ 245,80</p>
                 <p className="text-xs text-gray-400">há 4 horas</p>
               </div>
             </div>
             
             <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div>
-                <p className="font-medium text-zinc-50">Boleto anexado</p>
-                <p className="text-sm text-gray-400">Aluguel - Janeiro</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-zinc-50 text-sm sm:text-base">Boleto anexado</p>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">Aluguel - Janeiro</p>
               </div>
-              <div className="text-right">
-                <p className="text-blue-400 font-bold">R$ 3.500,00</p>
+              <div className="text-right ml-2">
+                <p className="text-blue-400 font-bold text-sm sm:text-base">R$ 3.500,00</p>
                 <p className="text-xs text-gray-400">há 6 horas</p>
               </div>
             </div>
@@ -240,28 +243,28 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Alerts Section */}
-      <Card className="p-6 bg-gray-900 border-gray-800">
-        <h3 className="text-lg font-semibold mb-4 flex items-center text-zinc-50">
-          <AlertCircle className="h-5 w-5 mr-2 text-orange-400" />
+      <Card className="p-4 sm:p-6 bg-gray-900 border-gray-800">
+        <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center text-zinc-50">
+          <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-orange-400" />
           Alertas e Lembretes
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-            <h4 className="font-medium text-red-400 mb-2">Contas Vencidas</h4>
-            <p className="text-2xl font-bold text-red-400">3</p>
-            <p className="text-sm text-gray-400">Total: R$ 2.850,00</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <h4 className="font-medium text-red-400 mb-2 text-sm sm:text-base">Contas Vencidas</h4>
+            <p className="text-xl sm:text-2xl font-bold text-red-400">3</p>
+            <p className="text-xs sm:text-sm text-gray-400">Total: R$ 2.850,00</p>
           </div>
           
-          <div className="p-4 bg-orange-900/20 border border-orange-500/30 rounded-lg">
-            <h4 className="font-medium text-orange-400 mb-2">Vencendo Hoje</h4>
-            <p className="text-2xl font-bold text-orange-400">2</p>
-            <p className="text-sm text-gray-400">Total: R$ 1.420,00</p>
+          <div className="p-3 sm:p-4 bg-orange-900/20 border border-orange-500/30 rounded-lg">
+            <h4 className="font-medium text-orange-400 mb-2 text-sm sm:text-base">Vencendo Hoje</h4>
+            <p className="text-xl sm:text-2xl font-bold text-orange-400">2</p>
+            <p className="text-xs sm:text-sm text-gray-400">Total: R$ 1.420,00</p>
           </div>
           
-          <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-            <h4 className="font-medium text-blue-400 mb-2">Próximos 3 Dias</h4>
-            <p className="text-2xl font-bold text-blue-400">5</p>
-            <p className="text-sm text-gray-400">Total: R$ 8.950,00</p>
+          <div className="p-3 sm:p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <h4 className="font-medium text-blue-400 mb-2 text-sm sm:text-base">Próximos 3 Dias</h4>
+            <p className="text-xl sm:text-2xl font-bold text-blue-400">5</p>
+            <p className="text-xs sm:text-sm text-gray-400">Total: R$ 8.950,00</p>
           </div>
         </div>
       </Card>

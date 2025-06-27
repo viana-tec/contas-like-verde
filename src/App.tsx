@@ -9,6 +9,8 @@ import Contas from "./pages/Contas";
 import Usuarios from "./pages/Usuarios";
 import Boletos from "./pages/Boletos";
 import FolhaSalarial from "./pages/FolhaSalarial";
+import Pagamentos from "./pages/Pagamentos";
+import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,8 +25,10 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/contas" element={<Contas />} />
           <Route path="/boletos" element={<Boletos />} />
+          <Route path="/pagamentos" element={<Pagamentos />} />
           <Route path="/folha-salarial" element={<FolhaSalarial />} />
           <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/configuracoes" element={<Configuracoes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

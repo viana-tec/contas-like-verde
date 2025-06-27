@@ -166,7 +166,7 @@ export const FolhaSalarial: React.FC = () => {
 
       {/* Search and Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 md:col-span-2">
+        <Card className="p-4 md:col-span-2 bg-gray-900 border-gray-800">
           <Label htmlFor="search">Buscar Funcionário</Label>
           <Input
             id="search"
@@ -175,13 +175,13 @@ export const FolhaSalarial: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 bg-gray-900 border-gray-800">
           <div className="text-center">
             <div className="text-2xl font-bold text-[#39FF14]">{funcionarios.length}</div>
             <div className="text-sm text-gray-400">Total de Funcionários</div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 bg-gray-900 border-gray-800">
           <div className="text-center">
             <div className="text-2xl font-bold text-[#39FF14]">
               {formatCurrency(funcionarios.reduce((sum, f) => sum + parseFloat(f.salario), 0).toString())}
@@ -192,7 +192,7 @@ export const FolhaSalarial: React.FC = () => {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="bg-gray-900 border-gray-800">
         <Table>
           <TableHeader>
             <TableRow>

@@ -10,7 +10,8 @@ import {
   Users, 
   Settings,
   Menu,
-  X
+  X,
+  UserCheck
 } from 'lucide-react';
 
 const menuItems = [
@@ -19,6 +20,7 @@ const menuItems = [
   { name: 'Boletos', icon: Receipt, path: '/boletos' },
   { name: 'Pagamentos', icon: CreditCard, path: '/pagamentos' },
   { name: 'Relatórios', icon: PieChart, path: '/relatorios' },
+  { name: 'Folha Salarial', icon: UserCheck, path: '/folha-salarial' },
   { name: 'Usuários', icon: Users, path: '/usuarios' },
   { name: 'Configurações', icon: Settings, path: '/configuracoes' },
 ];

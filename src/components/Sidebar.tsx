@@ -10,7 +10,8 @@ import {
   UserCheck, 
   Settings,
   User,
-  BarChart3
+  BarChart3,
+  Zap
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -23,6 +24,7 @@ export const Sidebar: React.FC = () => {
     { name: 'Pagamentos', path: '/pagamentos', icon: DollarSign },
     { name: 'Folha Salarial', path: '/folha-salarial', icon: Users },
     { name: 'Relatórios', path: '/relatorios', icon: BarChart3 },
+    { name: 'Movimentações Pagar.me', path: '/movimentacoes-pagarme', icon: Zap },
     { name: 'Usuários', path: '/usuarios', icon: UserCheck },
     { name: 'Configurações', path: '/configuracoes', icon: Settings },
   ];

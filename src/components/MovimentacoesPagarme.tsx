@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -71,6 +70,51 @@ export const MovimentacoesPagarme = () => {
     });
   };
 
+  const makeApiRequest = async (endpoint: string) => {
+    if (!apiKey) {
+      throw new Error('Chave API não configurada');
+    }
+
+    console.log(`Fazendo requisição para: ${endpoint}`);
+    
+    // Usar proxy CORS para contornar limitações de CORS
+    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+    const targetUrl = `https://api.pagar.me${endpoint}`;
+    const fullUrl = proxyUrl + targetUrl;
+    
+    console.log('URL completa:', fullUrl);
+    
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+
+    console.log('Status da resposta:', response.status);
+    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Erro na resposta:', errorText);
+      
+      // Tentar fazer parse do JSON de erro
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(errorJson.message || `HTTP ${response.status}: ${errorText}`);
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log('Dados recebidos:', data);
+    return data;
+  };
+
   const testConnection = async () => {
     if (!apiKey) {
       toast({
@@ -89,26 +133,7 @@ export const MovimentacoesPagarme = () => {
       console.log('API Key (primeiros 10 chars):', apiKey.substring(0, 10) + '...');
       
       // Tentar endpoint mais simples primeiro
-      const response = await fetch('https://api.pagar.me/core/v5/balance', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Dados de saldo recebidos:', data);
+      const data = await makeApiRequest('/core/v5/balance');
       
       setConnectionStatus('connected');
       toast({
@@ -122,37 +147,32 @@ export const MovimentacoesPagarme = () => {
     } catch (error: any) {
       console.error('Erro na conexão:', error);
       setConnectionStatus('error');
-      setErrorDetails(error.message || 'Erro desconhecido');
+      
+      let errorMessage = error.message || 'Erro desconhecido';
+      
+      // Tratamento específico para erros comuns
+      if (errorMessage.includes('Failed to fetch')) {
+        errorMessage = 'Erro de CORS ou conectividade. Verifique se o proxy CORS está funcionando.';
+      } else if (errorMessage.includes('401')) {
+        errorMessage = 'Chave da API inválida. Verifique se a chave está correta.';
+      } else if (errorMessage.includes('403')) {
+        errorMessage = 'Acesso negado. Verifique as permissões da sua chave.';
+      }
+      
+      setErrorDetails(errorMessage);
       
       toast({
         title: "Erro de conexão",
-        description: "Falha ao conectar com a API. Verifique sua chave e conexão.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   const fetchOperations = async () => {
-    if (!apiKey) return [];
-
     try {
       console.log('Buscando operações...');
-      const response = await fetch('https://api.pagar.me/core/v5/balance/operations', {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro ao buscar operações:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Operações recebidas:', data);
+      const data = await makeApiRequest('/core/v5/balance/operations');
       return data.data || [];
     } catch (error) {
       console.error('Erro ao buscar operações:', error);
@@ -161,26 +181,9 @@ export const MovimentacoesPagarme = () => {
   };
 
   const fetchTransactions = async () => {
-    if (!apiKey) return [];
-
     try {
       console.log('Buscando transações...');
-      const response = await fetch('https://api.pagar.me/core/v5/transactions', {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro ao buscar transações:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Transações recebidas:', data);
+      const data = await makeApiRequest('/core/v5/transactions');
       return data.data || [];
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
@@ -215,6 +218,72 @@ export const MovimentacoesPagarme = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Função alternativa sem proxy (para teste local)
+  const testWithoutProxy = async () => {
+    if (!apiKey) return;
+
+    setConnectionStatus('connecting');
+    setErrorDetails('');
+
+    try {
+      // Criar dados fictícios para demonstração
+      const mockOperations = [
+        {
+          id: 'op_123456789',
+          type: 'payable',
+          status: 'paid',
+          amount: 10000,
+          fee: 200,
+          created_at: new Date().toISOString(),
+          description: 'Pagamento recebido'
+        },
+        {
+          id: 'op_987654321',
+          type: 'transfer',
+          status: 'transferred',
+          amount: 5000,
+          fee: 100,
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+          description: 'Transferência bancária'
+        }
+      ];
+
+      const mockTransactions = [
+        {
+          id: 'tx_111222333',
+          amount: 10000,
+          status: 'paid',
+          payment_method: 'credit_card',
+          created_at: new Date().toISOString(),
+          paid_at: new Date().toISOString()
+        },
+        {
+          id: 'tx_444555666',
+          amount: 5000,
+          status: 'processing',
+          payment_method: 'pix',
+          created_at: new Date(Date.now() - 3600000).toISOString()
+        }
+      ];
+
+      // Simular delay de rede
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setOperations(mockOperations);
+      setTransactions(mockTransactions);
+      setConnectionStatus('connected');
+
+      toast({
+        title: "Modo demonstração",
+        description: "Dados fictícios carregados para demonstração.",
+      });
+
+    } catch (error: any) {
+      setConnectionStatus('error');
+      setErrorDetails(error.message);
     }
   };
 
@@ -325,7 +394,15 @@ export const MovimentacoesPagarme = () => {
             {connectionStatus === 'connecting' ? (
               <RefreshCw size={16} className="animate-spin mr-2" />
             ) : null}
-            Testar
+            Testar API
+          </Button>
+          <Button 
+            onClick={testWithoutProxy} 
+            disabled={connectionStatus === 'connecting'}
+            className="bg-purple-600 text-white hover:bg-purple-700"
+            size="sm"
+          >
+            Demo
           </Button>
         </div>
       </div>
@@ -361,6 +438,9 @@ export const MovimentacoesPagarme = () => {
           {errorDetails && (
             <div className="mt-2 p-3 bg-red-900/20 border border-red-600 rounded">
               <p className="text-red-400 text-sm">{errorDetails}</p>
+              <p className="text-gray-400 text-xs mt-1">
+                💡 Dica: Se você está enfrentando problemas de CORS, tente usar o botão "Demo" para ver dados fictícios ou configure um servidor proxy.
+              </p>
             </div>
           )}
         </CardContent>

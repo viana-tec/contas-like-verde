@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Filter, Download, Eye, CreditCard, FileText, Smartphone, AlertCircle, RefreshCw } from 'lucide-react';
+import { Calendar, Filter, Download, Eye, CreditCard, FileText, Smartphone, AlertCircle, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
@@ -75,44 +76,51 @@ export const MovimentacoesPagarme = () => {
       throw new Error('Chave API não configurada');
     }
 
-    console.log(`Fazendo requisição para: ${endpoint}`);
+    console.log(`Tentando fazer requisição para: ${endpoint}`);
     
-    // Usar proxy CORS para contornar limitações de CORS
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const targetUrl = `https://api.pagar.me${endpoint}`;
-    const fullUrl = proxyUrl + targetUrl;
-    
-    console.log('URL completa:', fullUrl);
-    
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-    });
+    // Tentar fazer requisição direta primeiro
+    try {
+      const response = await fetch(`https://api.pagar.me${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
 
-    console.log('Status da resposta:', response.status);
-    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
+      console.log('Status da resposta:', response.status);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Erro na resposta:', errorText);
-      
-      // Tentar fazer parse do JSON de erro
-      try {
-        const errorJson = JSON.parse(errorText);
-        throw new Error(errorJson.message || `HTTP ${response.status}: ${errorText}`);
-      } catch {
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro na resposta:', errorText);
+        
+        // Tratamento específico para diferentes tipos de erro
+        if (response.status === 401) {
+          throw new Error('Chave da API inválida. Verifique se a chave está correta.');
+        } else if (response.status === 403) {
+          throw new Error('Acesso negado. Verifique as permissões da sua chave.');
+        } else if (response.status === 429) {
+          throw new Error('Muitas requisições. Aguarde um momento e tente novamente.');
+        }
+        
+        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
       }
-    }
 
-    const data = await response.json();
-    console.log('Dados recebidos:', data);
-    return data;
+      const data = await response.json();
+      console.log('Dados recebidos:', data);
+      return data;
+      
+    } catch (error: any) {
+      console.error('Erro na requisição:', error);
+      
+      // Se for erro de CORS, mostrar mensagem específica
+      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+        throw new Error('Erro de CORS: A API da Pagar.me não permite requisições diretas do navegador. Para uso em produção, implemente um backend intermediário.');
+      }
+      
+      throw error;
+    }
   };
 
   const testConnection = async () => {
@@ -130,9 +138,8 @@ export const MovimentacoesPagarme = () => {
     
     try {
       console.log('Testando conexão com a API Pagar.me...');
-      console.log('API Key (primeiros 10 chars):', apiKey.substring(0, 10) + '...');
       
-      // Tentar endpoint mais simples primeiro
+      // Tentar endpoint de balance primeiro
       const data = await makeApiRequest('/core/v5/balance');
       
       setConnectionStatus('connected');
@@ -147,26 +154,123 @@ export const MovimentacoesPagarme = () => {
     } catch (error: any) {
       console.error('Erro na conexão:', error);
       setConnectionStatus('error');
-      
-      let errorMessage = error.message || 'Erro desconhecido';
-      
-      // Tratamento específico para erros comuns
-      if (errorMessage.includes('Failed to fetch')) {
-        errorMessage = 'Erro de CORS ou conectividade. Verifique se o proxy CORS está funcionando.';
-      } else if (errorMessage.includes('401')) {
-        errorMessage = 'Chave da API inválida. Verifique se a chave está correta.';
-      } else if (errorMessage.includes('403')) {
-        errorMessage = 'Acesso negado. Verifique as permissões da sua chave.';
-      }
-      
-      setErrorDetails(errorMessage);
+      setErrorDetails(error.message);
       
       toast({
         title: "Erro de conexão",
-        description: errorMessage,
+        description: error.message,
         variant: "destructive",
       });
     }
+  };
+
+  const loadDemoData = () => {
+    console.log('Carregando dados de demonstração...');
+    
+    const mockOperations: BalanceOperation[] = [
+      {
+        id: 'op_clm123456789',
+        type: 'payable',
+        status: 'paid',
+        amount: 15000,
+        fee: 450,
+        created_at: new Date().toISOString(),
+        description: 'Pagamento de cartão de crédito'
+      },
+      {
+        id: 'op_clm987654321',
+        type: 'transfer',
+        status: 'transferred',
+        amount: 8500,
+        fee: 0,
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        description: 'Transferência para conta bancária'
+      },
+      {
+        id: 'op_clm555666777',
+        type: 'fee_collection',
+        status: 'available',
+        amount: -450,
+        fee: 0,
+        created_at: new Date(Date.now() - 172800000).toISOString(),
+        description: 'Taxa de processamento'
+      },
+      {
+        id: 'op_clm444333222',
+        type: 'refund',
+        status: 'refunded',
+        amount: -2500,
+        fee: 0,
+        created_at: new Date(Date.now() - 259200000).toISOString(),
+        description: 'Estorno de pagamento'
+      },
+      {
+        id: 'op_clm111222333',
+        type: 'payable',
+        status: 'waiting_funds',
+        amount: 12000,
+        fee: 360,
+        created_at: new Date(Date.now() - 345600000).toISOString(),
+        description: 'Pagamento PIX pendente'
+      }
+    ];
+
+    const mockTransactions: Transaction[] = [
+      {
+        id: 'tran_abc123456789',
+        amount: 15000,
+        status: 'paid',
+        payment_method: 'credit_card',
+        created_at: new Date().toISOString(),
+        paid_at: new Date().toISOString()
+      },
+      {
+        id: 'tran_def987654321',
+        amount: 12000,
+        status: 'processing',
+        payment_method: 'pix',
+        created_at: new Date(Date.now() - 3600000).toISOString(),
+        pix: {
+          qr_code: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+        }
+      },
+      {
+        id: 'tran_ghi555666777',
+        amount: 8500,
+        status: 'paid',
+        payment_method: 'boleto',
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        paid_at: new Date(Date.now() - 86400000).toISOString(),
+        boleto: {
+          line: '34191.79001 01043.510047 91020.150008 1 84560000002000',
+          pdf: 'https://api.pagar.me/core/v5/transactions/tran_ghi555666777/boleto'
+        }
+      },
+      {
+        id: 'tran_jkl444333222',
+        amount: 2500,
+        status: 'refused',
+        payment_method: 'credit_card',
+        created_at: new Date(Date.now() - 172800000).toISOString()
+      },
+      {
+        id: 'tran_mno111222333',
+        amount: 7800,
+        status: 'paid',
+        payment_method: 'debit_card',
+        created_at: new Date(Date.now() - 259200000).toISOString(),
+        paid_at: new Date(Date.now() - 259200000).toISOString()
+      }
+    ];
+
+    setOperations(mockOperations);
+    setTransactions(mockTransactions);
+    setConnectionStatus('connected');
+
+    toast({
+      title: "Dados de demonstração carregados",
+      description: `${mockOperations.length} operações e ${mockTransactions.length} transações de exemplo.`,
+    });
   };
 
   const fetchOperations = async () => {
@@ -343,6 +447,7 @@ export const MovimentacoesPagarme = () => {
       available: { label: 'Disponível', variant: 'default' },
       waiting_funds: { label: 'Aguardando', variant: 'secondary' },
       transferred: { label: 'Transferido', variant: 'outline' },
+      refunded: { label: 'Estornado', variant: 'destructive' },
     };
 
     const statusInfo = statusMap[status] || { label: status, variant: 'outline' };
@@ -364,6 +469,15 @@ export const MovimentacoesPagarme = () => {
       case 'connecting': return 'Conectando...';
       case 'error': return 'Erro na conexão';
       default: return 'Não conectado';
+    }
+  };
+
+  const getConnectionStatusIcon = () => {
+    switch (connectionStatus) {
+      case 'connected': return <CheckCircle size={20} className="text-green-400" />;
+      case 'connecting': return <RefreshCw size={20} className="text-yellow-400 animate-spin" />;
+      case 'error': return <XCircle size={20} className="text-red-400" />;
+      default: return <AlertCircle size={20} className="text-gray-400" />;
     }
   };
 
@@ -397,7 +511,7 @@ export const MovimentacoesPagarme = () => {
             Testar API
           </Button>
           <Button 
-            onClick={testWithoutProxy} 
+            onClick={loadDemoData} 
             disabled={connectionStatus === 'connecting'}
             className="bg-purple-600 text-white hover:bg-purple-700"
             size="sm"
@@ -411,12 +525,8 @@ export const MovimentacoesPagarme = () => {
       <Card className="bg-[#1a1a1a] border-gray-800">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-green-400' : 
-                connectionStatus === 'connecting' ? 'bg-yellow-400' : 
-                connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
-              }`} />
+            <div className="flex items-center gap-3">
+              {getConnectionStatusIcon()}
               <span className={`font-medium ${getConnectionStatusColor()}`}>
                 {getConnectionStatusText()}
               </span>
@@ -436,11 +546,16 @@ export const MovimentacoesPagarme = () => {
             )}
           </div>
           {errorDetails && (
-            <div className="mt-2 p-3 bg-red-900/20 border border-red-600 rounded">
-              <p className="text-red-400 text-sm">{errorDetails}</p>
-              <p className="text-gray-400 text-xs mt-1">
-                💡 Dica: Se você está enfrentando problemas de CORS, tente usar o botão "Demo" para ver dados fictícios ou configure um servidor proxy.
-              </p>
+            <div className="mt-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
+              <p className="text-red-400 text-sm font-medium mb-2">Erro: {errorDetails}</p>
+              <div className="text-gray-400 text-xs space-y-1">
+                <p>💡 <strong>Soluções sugeridas:</strong></p>
+                <ul className="list-disc list-inside ml-4 space-y-1">
+                  <li>Clique em "Demo" para ver dados de exemplo</li>
+                  <li>Verifique se sua chave API está correta</li>
+                  <li>Para uso em produção, implemente um backend intermediário</li>
+                </ul>
+              </div>
             </div>
           )}
         </CardContent>
@@ -451,13 +566,13 @@ export const MovimentacoesPagarme = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-yellow-400">
               <AlertCircle size={20} />
-              <p>Configure sua chave da API Pagar.me para visualizar os dados.</p>
+              <p>Configure sua chave da API Pagar.me para visualizar os dados reais, ou clique em "Demo" para ver dados de exemplo.</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {connectionStatus === 'connected' && (
+      {(connectionStatus === 'connected' || (operations.length > 0 && transactions.length > 0)) && (
         <>
           {/* Resumo dos Dados */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -568,11 +683,13 @@ export const MovimentacoesPagarme = () => {
                       {operations.slice(0, 10).map((operation) => (
                         <TableRow key={operation.id}>
                           <TableCell className="text-gray-300 font-mono text-xs">
-                            {operation.id.substring(0, 8)}...
+                            {operation.id.substring(0, 12)}...
                           </TableCell>
-                          <TableCell className="text-gray-300">{operation.type}</TableCell>
+                          <TableCell className="text-gray-300 capitalize">{operation.type.replace('_', ' ')}</TableCell>
                           <TableCell>{getStatusBadge(operation.status)}</TableCell>
-                          <TableCell className="text-[#39FF14] font-semibold">
+                          <TableCell className={`font-semibold ${
+                            operation.amount >= 0 ? 'text-[#39FF14]' : 'text-red-400'
+                          }`}>
                             {formatCurrency(operation.amount)}
                           </TableCell>
                           <TableCell className="text-gray-300">
@@ -606,18 +723,19 @@ export const MovimentacoesPagarme = () => {
                         <TableHead className="text-gray-300">Valor</TableHead>
                         <TableHead className="text-gray-300">Status</TableHead>
                         <TableHead className="text-gray-300">Data</TableHead>
+                        <TableHead className="text-gray-300">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {transactions.slice(0, 10).map((transaction) => (
                         <TableRow key={transaction.id}>
                           <TableCell className="text-gray-300 font-mono text-xs">
-                            {transaction.id.substring(0, 8)}...
+                            {transaction.id.substring(0, 12)}...
                           </TableCell>
                           <TableCell className="text-gray-300">
                             <div className="flex items-center gap-2">
                               {getPaymentMethodIcon(transaction.payment_method)}
-                              {transaction.payment_method}
+                              <span className="capitalize">{transaction.payment_method.replace('_', ' ')}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-[#39FF14] font-semibold">
@@ -627,6 +745,65 @@ export const MovimentacoesPagarme = () => {
                           <TableCell className="text-gray-300">
                             {formatDate(transaction.created_at)}
                           </TableCell>
+                          <TableCell>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => setSelectedTransaction(transaction)}
+                                >
+                                  <Eye size={14} />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="bg-[#1a1a1a] border-gray-800 text-white">
+                                <DialogHeader>
+                                  <DialogTitle>Detalhes da Transação</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-sm text-gray-400">ID da Transação</p>
+                                    <p className="font-mono text-sm">{transaction.id}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-400">Valor</p>
+                                    <p className="text-lg font-semibold text-[#39FF14]">
+                                      {formatCurrency(transaction.amount)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-400">Status</p>
+                                    <div className="mt-1">{getStatusBadge(transaction.status)}</div>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-400">Método de Pagamento</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      {getPaymentMethodIcon(transaction.payment_method)}
+                                      <span className="capitalize">{transaction.payment_method.replace('_', ' ')}</span>
+                                    </div>
+                                  </div>
+                                  {transaction.boleto && (
+                                    <div>
+                                      <p className="text-sm text-gray-400">Linha Digitável</p>
+                                      <p className="font-mono text-sm bg-gray-800 p-2 rounded">
+                                        {transaction.boleto.line}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="text-sm text-gray-400">Data de Criação</p>
+                                    <p>{formatDate(transaction.created_at)}</p>
+                                  </div>
+                                  {transaction.paid_at && (
+                                    <div>
+                                      <p className="text-sm text-gray-400">Data de Pagamento</p>
+                                      <p>{formatDate(transaction.paid_at)}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -635,20 +812,26 @@ export const MovimentacoesPagarme = () => {
               </CardContent>
             </Card>
           )}
-
-          {/* Mensagem quando não há dados */}
-          {operations.length === 0 && transactions.length === 0 && !loading && (
-            <Card className="bg-[#1a1a1a] border-gray-800">
-              <CardContent className="p-8 text-center">
-                <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-2">Nenhum dado encontrado</h3>
-                <p className="text-gray-400">
-                  Não foram encontradas operações ou transações para esta conta.
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </>
+      )}
+
+      {/* Mensagem quando não há dados */}
+      {operations.length === 0 && transactions.length === 0 && connectionStatus !== 'connecting' && (
+        <Card className="bg-[#1a1a1a] border-gray-800">
+          <CardContent className="p-8 text-center">
+            <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-2">Nenhum dado disponível</h3>
+            <p className="text-gray-400 mb-4">
+              Clique em "Demo" para carregar dados de exemplo ou configure sua chave API e teste a conexão.
+            </p>
+            <Button 
+              onClick={loadDemoData}
+              className="bg-purple-600 text-white hover:bg-purple-700"
+            >
+              Carregar Dados Demo
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

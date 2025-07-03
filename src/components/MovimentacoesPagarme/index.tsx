@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { createClient } from '@supabase/supabase-js';
 import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType } from './types';
 import { ApiConfiguration } from './ApiConfiguration';
 import { ConnectionStatus } from './ConnectionStatus';
@@ -12,6 +13,12 @@ import { OperationsTable } from './OperationsTable';
 import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { getMockOperations, getMockTransactions } from './mockData';
+
+// Initialize Supabase client
+const supabase = createClient(
+  'https://zhnrtxjgimzsezxedtne.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpobnJ0eGpnaW16c2V6eGVkdG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5MTU3MzIsImV4cCI6MjA1MTQ5MTczMn0.OKbLHSJE6xHGkj8IfP1wfhcDsYZpTOc9eQ7mfJz_Gzs'
+);
 
 export const MovimentacoesPagarme = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');
@@ -36,46 +43,38 @@ export const MovimentacoesPagarme = () => {
       throw new Error('Chave API não configurada');
     }
 
-    console.log(`Tentando fazer requisição para: ${endpoint}`);
+    console.log(`Fazendo requisição via Edge Function para: ${endpoint}`);
     
     try {
-      const response = await fetch(`https://api.pagar.me${endpoint}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+      const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
+        body: {
+          endpoint,
+          apiKey
+        }
       });
 
-      console.log('Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta:', errorText);
-        
-        if (response.status === 401) {
-          throw new Error('Chave da API inválida. Verifique se a chave está correta.');
-        } else if (response.status === 403) {
-          throw new Error('Acesso negado. Verifique as permissões da sua chave.');
-        } else if (response.status === 429) {
-          throw new Error('Muitas requisições. Aguarde um momento e tente novamente.');
-        }
-        
-        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
+      if (error) {
+        console.error('Erro na Edge Function:', error);
+        throw new Error(`Erro na comunicação: ${error.message}`);
       }
 
-      const data = await response.json();
-      console.log('Dados recebidos:', data);
+      if (data.error) {
+        console.error('Erro retornado pela API:', data);
+        
+        if (data.details?.message?.includes('Invalid API key')) {
+          throw new Error('Chave da API inválida. Verifique se a chave está correta.');
+        } else if (data.details?.message?.includes('Forbidden')) {
+          throw new Error('Acesso negado. Verifique as permissões da sua chave.');
+        }
+        
+        throw new Error(data.details?.message || data.error);
+      }
+
+      console.log('Dados recebidos com sucesso:', data);
       return data;
       
     } catch (error: any) {
       console.error('Erro na requisição:', error);
-      
-      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-        throw new Error('Erro de CORS: A API da Pagar.me não permite requisições diretas do navegador. Para uso em produção, implemente um backend intermediário.');
-      }
-      
       throw error;
     }
   };
@@ -94,7 +93,7 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('Testando conexão com a API Pagar.me...');
+      console.log('Testando conexão com a API Pagar.me via Edge Function...');
       const data = await makeApiRequest('/core/v5/balance');
       
       setConnectionStatus('connected');

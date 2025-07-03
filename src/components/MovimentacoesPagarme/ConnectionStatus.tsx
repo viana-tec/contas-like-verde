@@ -77,7 +77,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
               <ul className="list-disc list-inside ml-4 space-y-1">
                 <li>Clique em "Demo" para ver dados de exemplo</li>
                 <li>Verifique se sua chave API está correta</li>
-                <li>Para uso em produção, implemente um backend intermediário</li>
+                <li>A conexão agora usa um proxy seguro via Supabase</li>
               </ul>
             </div>
           </div>

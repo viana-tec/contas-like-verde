@@ -14,26 +14,75 @@ function isValidPagarmeApiKey(apiKey: string): boolean {
 }
 
 serve(async (req) => {
-  console.log(`[${new Date().toISOString()}] Nova requisição recebida: ${req.method}`);
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] === NOVA REQUISIÇÃO ===`);
+  console.log(`[${timestamp}] Método: ${req.method}`);
+  console.log(`[${timestamp}] URL: ${req.url}`);
+  console.log(`[${timestamp}] Headers:`, Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Respondendo a requisição OPTIONS (CORS preflight)');
+    console.log(`[${timestamp}] Respondendo a requisição OPTIONS (CORS preflight)`);
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-    const { endpoint, apiKey } = body;
-    
-    console.log(`Dados recebidos: endpoint=${endpoint}, apiKey presente=${!!apiKey}`);
-    
-    if (!endpoint || !apiKey) {
-      console.error('Erro: Endpoint ou API key ausentes');
+    // Verificar se há body na requisição
+    let body;
+    try {
+      const text = await req.text();
+      console.log(`[${timestamp}] Body recebido (texto):`, text);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Body da requisição está vazio');
+      }
+      
+      body = JSON.parse(text);
+      console.log(`[${timestamp}] Body parseado:`, body);
+    } catch (parseError) {
+      console.error(`[${timestamp}] Erro ao parsear JSON:`, parseError);
       return new Response(
         JSON.stringify({ 
-          error: 'Endpoint e API key são obrigatórios',
-          details: 'Por favor, configure sua chave da API Pagar.me'
+          error: 'Formato de dados inválido',
+          details: 'O corpo da requisição deve ser um JSON válido',
+          debug: { parseError: parseError.message }
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    const { endpoint, apiKey } = body;
+    
+    console.log(`[${timestamp}] Dados extraídos:`, {
+      endpoint: endpoint,
+      apiKeyPresente: !!apiKey,
+      apiKeyLength: apiKey ? apiKey.length : 0,
+      apiKeyPrefix: apiKey ? apiKey.substring(0, 5) + '...' : 'N/A'
+    });
+    
+    if (!endpoint) {
+      console.error(`[${timestamp}] Endpoint ausente`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Endpoint obrigatório',
+          details: 'O parâmetro "endpoint" é obrigatório na requisição'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    if (!apiKey) {
+      console.error(`[${timestamp}] API key ausente`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Chave API obrigatória',
+          details: 'O parâmetro "apiKey" é obrigatório na requisição'
         }),
         { 
           status: 400, 
@@ -44,11 +93,20 @@ serve(async (req) => {
 
     // Validar formato da chave API
     if (!isValidPagarmeApiKey(apiKey)) {
-      console.error('Erro: Formato da chave API inválido');
+      console.error(`[${timestamp}] Formato da chave API inválido:`, {
+        apiKey: apiKey.substring(0, 10) + '...',
+        startsWithSk: apiKey.startsWith('sk_'),
+        length: apiKey.length
+      });
       return new Response(
         JSON.stringify({ 
           error: 'Formato da chave API inválido',
-          details: 'A chave deve começar com "sk_" e ter o formato correto da Pagar.me'
+          details: 'A chave deve começar com "sk_" e ter o formato correto da Pagar.me',
+          debug: {
+            startsWithSk: apiKey.startsWith('sk_'),
+            length: apiKey.length,
+            expected: 'sk_xxxxxxxxxxxxxxxxx'
+          }
         }),
         { 
           status: 400, 
@@ -58,24 +116,48 @@ serve(async (req) => {
     }
 
     const fullUrl = `https://api.pagar.me${endpoint}`;
-    console.log(`Fazendo requisição para: ${fullUrl}`);
+    console.log(`[${timestamp}] URL completa para requisição:`, fullUrl);
+    
+    const requestHeaders = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Lovable-Pagarme-Integration/1.0',
+    };
+    
+    console.log(`[${timestamp}] Headers da requisição:`, {
+      ...requestHeaders,
+      'Authorization': 'Bearer ' + apiKey.substring(0, 10) + '...'
+    });
+
+    console.log(`[${timestamp}] Fazendo requisição para API Pagar.me...`);
     
     const response = await fetch(fullUrl, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Lovable-Pagarme-Integration/1.0',
-      },
+      headers: requestHeaders,
     });
 
-    console.log(`Resposta recebida da API Pagar.me: Status ${response.status}`);
+    console.log(`[${timestamp}] Resposta recebida:`, {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    console.log(`[${timestamp}] Texto da resposta:`, responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log(`[${timestamp}] Dados parseados:`, data);
+    } catch (e) {
+      console.error(`[${timestamp}] Erro ao parsear resposta da API:`, e);
+      data = { raw_response: responseText };
+    }
     
     if (!response.ok) {
-      console.error('Erro na resposta da API Pagar.me:', {
+      console.error(`[${timestamp}] Erro na resposta da API Pagar.me:`, {
         status: response.status,
         statusText: response.statusText,
         data: data
@@ -87,7 +169,7 @@ serve(async (req) => {
       // Tratar erros específicos da Pagar.me
       if (response.status === 401) {
         errorMessage = 'Chave da API inválida ou sem permissões';
-        errorDetails = 'Verifique se sua chave API está correta e tem as permissões necessárias';
+        errorDetails = 'Verifique se sua chave API está correta e tem as permissões necessárias. Certifique-se de que é uma chave SECRET (sk_) e não PUBLIC (pk_)';
       } else if (response.status === 403) {
         errorMessage = 'Acesso negado';
         errorDetails = 'Sua chave API não tem permissão para acessar este recurso';
@@ -103,7 +185,12 @@ serve(async (req) => {
         JSON.stringify({ 
           error: errorMessage,
           details: errorDetails,
-          status: response.status
+          status: response.status,
+          debug: {
+            endpoint: endpoint,
+            fullUrl: fullUrl,
+            responseData: data
+          }
         }),
         { 
           status: response.status, 
@@ -112,7 +199,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Dados recebidos com sucesso da API Pagar.me');
+    console.log(`[${timestamp}] === SUCESSO === Dados recebidos com sucesso da API Pagar.me`);
     
     return new Response(
       JSON.stringify(data),
@@ -122,10 +209,11 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Erro na Edge Function:', {
+    console.error(`[${timestamp}] === ERRO CRÍTICO ===`, {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      cause: error.cause
     });
     
     let errorMessage = 'Erro interno do servidor';
@@ -134,17 +222,25 @@ serve(async (req) => {
     // Tratar diferentes tipos de erro
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       errorMessage = 'Erro de conexão com a API Pagar.me';
-      errorDetails = 'Verifique sua conexão com a internet e tente novamente';
+      errorDetails = 'Não foi possível conectar com a API. Verifique sua conexão com a internet';
     } else if (error.message.includes('JSON')) {
       errorMessage = 'Erro ao processar dados';
       errorDetails = 'Dados inválidos recebidos na requisição';
+    } else if (error.message.includes('network')) {
+      errorMessage = 'Erro de rede';
+      errorDetails = 'Problema de conectividade. Tente novamente';
     }
     
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
         details: errorDetails,
-        timestamp: new Date().toISOString()
+        timestamp: timestamp,
+        debug: {
+          errorName: error.name,
+          errorMessage: error.message,
+          stack: error.stack?.substring(0, 500)
+        }
       }),
       { 
         status: 500, 

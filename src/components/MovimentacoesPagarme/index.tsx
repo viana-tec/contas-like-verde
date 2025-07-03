@@ -72,32 +72,69 @@ export const MovimentacoesPagarme = () => {
       throw new Error('Formato da chave API inválido. Deve começar com "sk_"');
     }
 
-    console.log(`Fazendo requisição via Edge Function para: ${endpoint}`);
+    console.log(`🚀 Iniciando requisição para: ${endpoint}`);
+    console.log(`🔑 Usando chave API: ${apiKey.substring(0, 10)}...`);
     
     try {
-      const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
-        body: {
-          endpoint,
-          apiKey
-        }
+      const requestBody = {
+        endpoint,
+        apiKey
+      };
+      
+      console.log('📤 Enviando dados para Edge Function:', {
+        endpoint: endpoint,
+        apiKeyLength: apiKey.length,
+        apiKeyPrefix: apiKey.substring(0, 5) + '...'
       });
 
+      const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
+        body: requestBody
+      });
+
+      console.log('📥 Resposta da Edge Function:', { data, error });
+
       if (error) {
-        console.error('Erro na Edge Function:', error);
-        throw new Error(`Erro na comunicação: ${error.message}`);
+        console.error('❌ Erro na Edge Function:', error);
+        
+        // Tentar extrair mais informações do erro
+        let errorMessage = error.message || 'Erro desconhecido';
+        
+        if (error.message?.includes('401')) {
+          errorMessage = 'Chave API inválida. Verifique se é uma chave SECRET (sk_) válida da Pagar.me';
+        } else if (error.message?.includes('403')) {
+          errorMessage = 'Acesso negado. Sua chave API não tem as permissões necessárias';
+        } else if (error.message?.includes('404')) {
+          errorMessage = 'Endpoint não encontrado. Verifique se a URL está correta';
+        } else if (error.message?.includes('500')) {
+          errorMessage = 'Erro interno da API Pagar.me. Tente novamente em alguns minutos';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       if (data?.error) {
-        console.error('Erro retornado pela API:', data);
+        console.error('❌ Erro retornado pela API:', data);
         throw new Error(data.details || data.error);
       }
 
-      console.log('Dados recebidos com sucesso:', data);
+      console.log('✅ Dados recebidos com sucesso:', data);
       return data;
       
     } catch (error: any) {
-      console.error('Erro na requisição:', error);
-      throw error;
+      console.error('💥 Erro na requisição:', error);
+      
+      // Melhorar mensagens de erro
+      let friendlyMessage = error.message;
+      
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        friendlyMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
+      } else if (error.message?.includes('JSON')) {
+        friendlyMessage = 'Erro ao processar resposta da API. Tente novamente';
+      } else if (error.message?.includes('timeout')) {
+        friendlyMessage = 'Tempo limite excedido. Tente novamente';
+      }
+      
+      throw new Error(friendlyMessage);
     }
   };
 
@@ -124,10 +161,14 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('Testando conexão com a API Pagar.me via Edge Function...');
+      console.log('🔄 Testando conexão com a API Pagar.me...');
+      
+      // Primeiro tentar um endpoint simples
       const data = await makeApiRequest('/core/v5/balance');
       
+      console.log('✅ Conexão estabelecida com sucesso!');
       setConnectionStatus('connected');
+      
       toast({
         title: "Conexão estabelecida",
         description: "Conectado com sucesso à API Pagar.me!",
@@ -137,7 +178,7 @@ export const MovimentacoesPagarme = () => {
       await fetchData();
       
     } catch (error: any) {
-      console.error('Erro na conexão:', error);
+      console.error('❌ Erro na conexão:', error);
       setConnectionStatus('error');
       setErrorDetails(error.message);
       
@@ -150,7 +191,7 @@ export const MovimentacoesPagarme = () => {
   };
 
   const loadDemoData = () => {
-    console.log('Carregando dados de demonstração...');
+    console.log('📊 Carregando dados de demonstração...');
     
     const mockOperations = getMockOperations();
     const mockTransactions = getMockTransactions();
@@ -168,22 +209,22 @@ export const MovimentacoesPagarme = () => {
 
   const fetchOperations = async () => {
     try {
-      console.log('Buscando operações...');
+      console.log('📈 Buscando operações...');
       const data = await makeApiRequest('/core/v5/balance/operations');
       return data.data || [];
     } catch (error) {
-      console.error('Erro ao buscar operações:', error);
+      console.error('❌ Erro ao buscar operações:', error);
       throw error;
     }
   };
 
   const fetchTransactions = async () => {
     try {
-      console.log('Buscando transações...');
+      console.log('💳 Buscando transações...');
       const data = await makeApiRequest('/core/v5/transactions');
       return data.data || [];
     } catch (error) {
-      console.error('Erro ao buscar transações:', error);
+      console.error('❌ Erro ao buscar transações:', error);
       throw error;
     }
   };
@@ -202,7 +243,7 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('Iniciando busca de dados...');
+      console.log('🔄 Iniciando busca de dados...');
       const [operationsData, transactionsData] = await Promise.all([
         fetchOperations(),
         fetchTransactions()
@@ -217,7 +258,7 @@ export const MovimentacoesPagarme = () => {
       });
       
     } catch (error: any) {
-      console.error('Erro ao buscar dados:', error);
+      console.error('❌ Erro ao buscar dados:', error);
       setErrorDetails(error.message);
       setConnectionStatus('error');
       
@@ -260,7 +301,16 @@ export const MovimentacoesPagarme = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-yellow-400">
               <AlertCircle size={20} />
-              <p>Configure sua chave da API Pagar.me para visualizar os dados reais, ou clique em "Demo" para ver dados de exemplo.</p>
+              <div>
+                <p className="font-medium">⚠️ Chave API não configurada</p>
+                <p className="text-sm mt-1">
+                  Configure sua chave <strong>SECRET</strong> da API Pagar.me (sk_...) para visualizar os dados reais, 
+                  ou clique em "Demo" para ver dados de exemplo.
+                </p>
+                <p className="text-xs mt-2 opacity-75">
+                  💡 Certifique-se de usar uma chave SECRET (sk_) e não PUBLIC (pk_)
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

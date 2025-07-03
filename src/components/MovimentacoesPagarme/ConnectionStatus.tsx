@@ -29,9 +29,9 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
 
   const getConnectionStatusText = () => {
     switch (status) {
-      case 'connected': return 'Conectado';
-      case 'connecting': return 'Conectando...';
-      case 'error': return 'Erro na conexão';
+      case 'connected': return 'Conectado à API Pagar.me';
+      case 'connecting': return 'Conectando à API Pagar.me...';
+      case 'error': return 'Erro na conexão com a API';
       default: return 'Não conectado';
     }
   };
@@ -71,13 +71,15 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
         </div>
         {errorDetails && (
           <div className="mt-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
-            <p className="text-red-400 text-sm font-medium mb-2">Erro: {errorDetails}</p>
+            <p className="text-red-400 text-sm font-medium mb-2">Detalhes do erro:</p>
+            <p className="text-red-300 text-sm mb-3">{errorDetails}</p>
             <div className="text-gray-400 text-xs space-y-1">
               <p>💡 <strong>Soluções sugeridas:</strong></p>
               <ul className="list-disc list-inside ml-4 space-y-1">
-                <li>Clique em "Demo" para ver dados de exemplo</li>
-                <li>Verifique se sua chave API está correta</li>
-                <li>A conexão agora usa um proxy seguro via Supabase</li>
+                <li>Verifique se sua chave API está correta e começa com "sk_"</li>
+                <li>Certifique-se de que a chave tem as permissões necessárias</li>
+                <li>Clique em "Demo" para testar com dados de exemplo</li>
+                <li>Tente novamente em alguns minutos se for erro de servidor</li>
               </ul>
             </div>
           </div>

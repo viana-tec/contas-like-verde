@@ -29,9 +29,34 @@ export const MovimentacoesPagarme = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const { toast } = useToast();
 
+  // Função para validar formato da chave API
+  const validateApiKey = (key: string): boolean => {
+    return key.startsWith('sk_') && key.length > 10;
+  };
+
   const saveApiKey = () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira uma chave API válida.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateApiKey(apiKey)) {
+      toast({
+        title: "Formato inválido",
+        description: "A chave da API deve começar com 'sk_' e ter o formato correto da Pagar.me.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     localStorage.setItem('pagarme_api_key', apiKey);
     setConnectionStatus('idle');
+    setErrorDetails('');
+    
     toast({
       title: "Chave API salva",
       description: "A chave da API foi salva com sucesso.",
@@ -41,6 +66,10 @@ export const MovimentacoesPagarme = () => {
   const makeApiRequest = async (endpoint: string) => {
     if (!apiKey) {
       throw new Error('Chave API não configurada');
+    }
+
+    if (!validateApiKey(apiKey)) {
+      throw new Error('Formato da chave API inválido. Deve começar com "sk_"');
     }
 
     console.log(`Fazendo requisição via Edge Function para: ${endpoint}`);
@@ -58,16 +87,9 @@ export const MovimentacoesPagarme = () => {
         throw new Error(`Erro na comunicação: ${error.message}`);
       }
 
-      if (data.error) {
+      if (data?.error) {
         console.error('Erro retornado pela API:', data);
-        
-        if (data.details?.message?.includes('Invalid API key')) {
-          throw new Error('Chave da API inválida. Verifique se a chave está correta.');
-        } else if (data.details?.message?.includes('Forbidden')) {
-          throw new Error('Acesso negado. Verifique as permissões da sua chave.');
-        }
-        
-        throw new Error(data.details?.message || data.error);
+        throw new Error(data.details || data.error);
       }
 
       console.log('Dados recebidos com sucesso:', data);
@@ -89,6 +111,15 @@ export const MovimentacoesPagarme = () => {
       return;
     }
 
+    if (!validateApiKey(apiKey)) {
+      toast({
+        title: "Formato inválido",
+        description: "A chave da API deve começar com 'sk_' e ter o formato correto da Pagar.me.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setConnectionStatus('connecting');
     setErrorDetails('');
     
@@ -102,7 +133,8 @@ export const MovimentacoesPagarme = () => {
         description: "Conectado com sucesso à API Pagar.me!",
       });
       
-      fetchData();
+      // Buscar dados automaticamente após conexão bem-sucedida
+      await fetchData();
       
     } catch (error: any) {
       console.error('Erro na conexão:', error);
@@ -126,6 +158,7 @@ export const MovimentacoesPagarme = () => {
     setOperations(mockOperations);
     setTransactions(mockTransactions);
     setConnectionStatus('connected');
+    setErrorDetails('');
 
     toast({
       title: "Dados de demonstração carregados",
@@ -156,10 +189,20 @@ export const MovimentacoesPagarme = () => {
   };
 
   const fetchData = async () => {
-    if (!apiKey) return;
+    if (!apiKey || !validateApiKey(apiKey)) {
+      toast({
+        title: "Erro",
+        description: "Chave API inválida ou não configurada.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
+    setErrorDetails('');
+    
     try {
+      console.log('Iniciando busca de dados...');
       const [operationsData, transactionsData] = await Promise.all([
         fetchOperations(),
         fetchTransactions()
@@ -174,7 +217,10 @@ export const MovimentacoesPagarme = () => {
       });
       
     } catch (error: any) {
+      console.error('Erro ao buscar dados:', error);
       setErrorDetails(error.message);
+      setConnectionStatus('error');
+      
       toast({
         title: "Erro ao carregar dados",
         description: error.message,
@@ -229,7 +275,7 @@ export const MovimentacoesPagarme = () => {
         </>
       )}
 
-      {!hasData && connectionStatus !== 'connecting' && (
+      {!hasData && connectionStatus !== 'connecting' && connectionStatus !== 'connected' && (
         <EmptyState onLoadDemo={loadDemoData} />
       )}
     </div>

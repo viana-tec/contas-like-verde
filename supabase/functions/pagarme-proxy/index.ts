@@ -22,7 +22,6 @@ serve(async (req) => {
   console.log(`\n🚀 [${timestamp}] === NOVA REQUISIÇÃO EDGE FUNCTION ===`);
   console.log(`📋 [${timestamp}] Método: ${req.method}`);
   console.log(`🌐 [${timestamp}] URL: ${req.url}`);
-  console.log(`📊 [${timestamp}] Headers:`, Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -39,7 +38,16 @@ serve(async (req) => {
       
       if (!text || text.trim() === '') {
         console.error(`❌ [${timestamp}] Body da requisição está vazio`);
-        throw new Error('Body da requisição está vazio');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Body da requisição está vazio',
+            details: 'O corpo da requisição deve ser um JSON válido'
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
       
       body = JSON.parse(text);
@@ -49,8 +57,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Formato de dados inválido',
-          details: 'O corpo da requisição deve ser um JSON válido',
-          debug: { parseError: parseError.message }
+          details: 'O corpo da requisição deve ser um JSON válido'
         }),
         { 
           status: 400, 
@@ -64,7 +71,6 @@ serve(async (req) => {
     console.log(`🎯 [${timestamp}] Endpoint solicitado:`, endpoint);
     console.log(`🔑 [${timestamp}] API Key presente:`, !!apiKey);
     console.log(`📏 [${timestamp}] API Key length:`, apiKey ? apiKey.length : 0);
-    console.log(`🔍 [${timestamp}] API Key format:`, apiKey ? `${apiKey.substring(0, 10)}...` : 'N/A');
     
     if (!endpoint) {
       console.error(`❌ [${timestamp}] Endpoint não fornecido`);
@@ -100,7 +106,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Formato da chave API inválido',
-          details: 'A chave deve ter pelo menos 20 caracteres e estar no formato correto da Pagar.me'
+          details: 'A chave deve ter pelo menos 20 caracteres'
         }),
         { 
           status: 400, 
@@ -114,7 +120,7 @@ serve(async (req) => {
     
     // Usar Basic Auth conforme documentação da Pagar.me
     const basicAuthCredentials = btoa(`${apiKey}:`);
-    console.log(`🔐 [${timestamp}] Basic Auth criado para API key:`, apiKey.substring(0, 15) + '...');
+    console.log(`🔐 [${timestamp}] Basic Auth criado`);
     
     const requestHeaders = {
       'Authorization': `Basic ${basicAuthCredentials}`,
@@ -123,15 +129,8 @@ serve(async (req) => {
       'User-Agent': 'Lovable-Pagarme-Integration/2.0',
     };
     
-    console.log(`📤 [${timestamp}] Headers da requisição:`, {
-      'Authorization': `Basic ${basicAuthCredentials.substring(0, 20)}...`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'User-Agent': 'Lovable-Pagarme-Integration/2.0'
-    });
+    console.log(`📤 [${timestamp}] Fazendo requisição para:`, fullUrl);
 
-    console.log(`🚀 [${timestamp}] Iniciando requisição para API Pagar.me...`);
-    
     // Fazer requisição com timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
@@ -149,7 +148,7 @@ serve(async (req) => {
       console.log(`📋 [${timestamp}] Response headers:`, Object.fromEntries(response.headers.entries()));
 
       const responseText = await response.text();
-      console.log(`📄 [${timestamp}] Response body (primeiros 500 chars):`, responseText.substring(0, 500));
+      console.log(`📄 [${timestamp}] Response body:`, responseText.substring(0, 500));
       
       let data;
       try {
@@ -157,7 +156,17 @@ serve(async (req) => {
         console.log(`✅ [${timestamp}] Response parseado com sucesso`);
       } catch (e) {
         console.error(`⚠️ [${timestamp}] Erro ao parsear response JSON:`, e);
-        data = { raw_response: responseText };
+        return new Response(
+          JSON.stringify({ 
+            error: 'Resposta inválida da API',
+            details: 'A API retornou uma resposta que não é JSON válido',
+            raw_response: responseText
+          }),
+          { 
+            status: 502, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
       
       if (!response.ok) {
@@ -168,7 +177,7 @@ serve(async (req) => {
         });
 
         let errorMessage = `Erro HTTP ${response.status}`;
-        let errorDetails = data;
+        let errorDetails = 'Erro desconhecido da API Pagar.me';
 
         // Tratar erros específicos da Pagar.me
         if (response.status === 401) {
@@ -181,8 +190,14 @@ serve(async (req) => {
           errorMessage = 'Endpoint não encontrado';
           errorDetails = 'O endpoint solicitado não existe na API Pagar.me';
         } else if (response.status === 422) {
-          errorMessage = 'Dados inválidos';
-          errorDetails = 'Os parâmetros enviados são inválidos';
+          errorMessage = 'Parâmetros inválidos';
+          errorDetails = data?.message || 'Os parâmetros enviados são inválidos';
+          
+          // Log detalhado para erro 422
+          if (data?.errors) {
+            console.log(`🔍 [${timestamp}] Detalhes do erro 422:`, data.errors);
+            errorDetails += `. Detalhes: ${JSON.stringify(data.errors)}`;
+          }
         } else if (response.status >= 500) {
           errorMessage = 'Erro interno da API Pagar.me';
           errorDetails = 'Erro no servidor da Pagar.me. Tente novamente em alguns minutos';
@@ -207,8 +222,7 @@ serve(async (req) => {
         );
       }
 
-      console.log(`🎉 [${timestamp}] === SUCESSO TOTAL === Dados recebidos da Pagar.me`);
-      console.log(`📊 [${timestamp}] Dados válidos retornados:`, typeof data, Array.isArray(data?.data) ? `array com ${data.data.length} items` : 'objeto');
+      console.log(`🎉 [${timestamp}] === SUCESSO === Dados recebidos da Pagar.me`);
       
       return new Response(
         JSON.stringify(data),
@@ -225,8 +239,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             error: 'Timeout na conexão',
-            details: 'A requisição para a API Pagar.me demorou mais que 30 segundos',
-            timestamp: timestamp
+            details: 'A requisição para a API Pagar.me demorou mais que 30 segundos'
           }),
           { 
             status: 408, 
@@ -239,7 +252,7 @@ serve(async (req) => {
     }
 
   } catch (error: any) {
-    console.error(`💥 [${timestamp}] === ERRO CRÍTICO GERAL ===`, error);
+    console.error(`💥 [${timestamp}] === ERRO CRÍTICO ===`, error);
     
     let errorMessage = 'Erro interno do servidor';
     let errorDetails = error.message;
@@ -253,12 +266,7 @@ serve(async (req) => {
       JSON.stringify({ 
         error: errorMessage,
         details: errorDetails,
-        timestamp: timestamp,
-        debug: {
-          errorName: error.name,
-          errorMessage: error.message,
-          stack: error.stack
-        }
+        timestamp: timestamp
       }),
       { 
         status: 500, 

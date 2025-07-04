@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType } from './types';
 import { ApiConfiguration } from './ApiConfiguration';
 import { ConnectionStatus } from './ConnectionStatus';
@@ -14,12 +14,6 @@ import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { getMockOperations, getMockTransactions } from './mockData';
 
-// Initialize Supabase client
-const supabase = createClient(
-  'https://zhnrtxjgimzsezxedtne.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpobnJ0eGpnaW16c2V6eGVkdG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5MTU3MzIsImV4cCI6MjA1MTQ5MTczMn0.OKbLHSJE6xHGkj8IfP1wfhcDsYZpTOc9eQ7mfJz_Gzs'
-);
-
 export const MovimentacoesPagarme = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');
   const [operations, setOperations] = useState<BalanceOperation[]>([]);
@@ -29,12 +23,11 @@ export const MovimentacoesPagarme = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const { toast } = useToast();
 
-  // Função para validar formato da chave API Pagar.me (baseada na documentação oficial)
+  // Função para validar formato da chave API Pagar.me
   const validateApiKey = (key: string): boolean => {
     if (!key || typeof key !== 'string') {
       return false;
     }
-    // Pagar.me aceita diferentes formatos, mas deve ter pelo menos 20 caracteres
     return key.trim().length >= 20;
   };
 
@@ -77,7 +70,6 @@ export const MovimentacoesPagarme = () => {
     }
 
     console.log(`🚀 [FRONTEND] Fazendo requisição para: ${endpoint}`);
-    console.log(`🔑 [FRONTEND] API Key: ${apiKey.substring(0, 15)}...`);
     
     try {
       const requestBody = {
@@ -87,8 +79,7 @@ export const MovimentacoesPagarme = () => {
       
       console.log('📤 [FRONTEND] Enviando para Edge Function:', {
         endpoint: endpoint,
-        apiKeyPrefix: apiKey.substring(0, 15) + '...',
-        bodySize: JSON.stringify(requestBody).length
+        apiKeyPrefix: apiKey.substring(0, 15) + '...'
       });
 
       const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
@@ -98,12 +89,18 @@ export const MovimentacoesPagarme = () => {
       console.log('📥 [FRONTEND] Resposta da Edge Function:', { 
         hasData: !!data, 
         hasError: !!error,
-        dataType: typeof data,
-        errorType: typeof error
+        data: data,
+        error: error
       });
 
       if (error) {
         console.error('❌ [FRONTEND] Erro na Edge Function:', error);
+        
+        // Tratar diferentes tipos de erro do Supabase
+        if (error.message?.includes('non-2xx status code')) {
+          throw new Error('Erro na comunicação com a API Pagar.me. Verifique sua chave API.');
+        }
+        
         throw new Error(error.message || 'Erro na comunicação com a API');
       }
 
@@ -148,9 +145,9 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 [FRONTEND] Testando conexão com endpoint de recebíveis...');
+      console.log('🔄 [FRONTEND] Testando conexão...');
       
-      // Usar endpoint de recebíveis conforme documentação oficial
+      // Usar endpoint mais simples para teste
       const data = await makeApiRequest('/core/v5/payables?count=1');
       
       console.log('✅ [FRONTEND] Conexão estabelecida! Dados recebidos:', data);
@@ -196,24 +193,12 @@ export const MovimentacoesPagarme = () => {
 
   const fetchPayables = async () => {
     try {
-      console.log('💰 [FRONTEND] Buscando recebíveis (payables)...');
+      console.log('💰 [FRONTEND] Buscando recebíveis...');
       const data = await makeApiRequest('/core/v5/payables?count=25');
       console.log('📊 [FRONTEND] Recebíveis retornados:', data);
       return data.data || [];
     } catch (error) {
       console.error('❌ [FRONTEND] Erro ao buscar recebíveis:', error);
-      throw error;
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      console.log('💳 [FRONTEND] Buscando transações...');
-      const data = await makeApiRequest('/core/v5/transactions?count=25');
-      console.log('📊 [FRONTEND] Transações retornadas:', data);
-      return data.data || [];
-    } catch (error) {
-      console.error('❌ [FRONTEND] Erro ao buscar transações:', error);
       throw error;
     }
   };
@@ -234,14 +219,11 @@ export const MovimentacoesPagarme = () => {
     try {
       console.log('🔄 [FRONTEND] Buscando dados da Pagar.me...');
       
-      const [payablesData, transactionsData] = await Promise.all([
-        fetchPayables(),
-        fetchTransactions()
-      ]);
+      // Buscar apenas payables por enquanto (transações requerem parâmetros específicos)
+      const payablesData = await fetchPayables();
       
       console.log('📊 [FRONTEND] Dados processados:', {
-        payables: payablesData?.length || 0,
-        transactions: transactionsData?.length || 0
+        payables: payablesData?.length || 0
       });
       
       // Converter payables para operations format
@@ -256,11 +238,11 @@ export const MovimentacoesPagarme = () => {
       }));
       
       setOperations(operationsFromPayables);
-      setTransactions(transactionsData || []);
+      setTransactions([]); // Limpar transações por enquanto
       
       toast({
         title: "Dados carregados",
-        description: `${operationsFromPayables.length} recebíveis e ${(transactionsData || []).length} transações carregadas.`,
+        description: `${operationsFromPayables.length} recebíveis carregados.`,
       });
       
     } catch (error: any) {
@@ -327,7 +309,7 @@ export const MovimentacoesPagarme = () => {
           <DataSummary operations={operations} transactions={transactions} />
           <ChartsSection operations={operations} />
           <OperationsTable operations={operations} />
-          <TransactionsTable transactions={transactions} />
+          {transactions.length > 0 && <TransactionsTable transactions={transactions} />}
         </>
       )}
 

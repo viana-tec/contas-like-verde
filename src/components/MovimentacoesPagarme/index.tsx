@@ -29,9 +29,9 @@ export const MovimentacoesPagarme = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const { toast } = useToast();
 
-  // Função para validar formato da chave API
+  // Função para validar formato da chave API Pagar.me
   const validateApiKey = (key: string): boolean => {
-    return key.startsWith('sk_') && key.length > 10;
+    return key.startsWith('sk_test_') || key.startsWith('sk_live_');
   };
 
   const saveApiKey = () => {
@@ -46,8 +46,8 @@ export const MovimentacoesPagarme = () => {
 
     if (!validateApiKey(apiKey)) {
       toast({
-        title: "Formato inválido",
-        description: "A chave da API deve começar com 'sk_' e ter o formato correto da Pagar.me.",
+        title: "Formato inválido", 
+        description: "A chave da API deve começar com 'sk_test_' ou 'sk_live_'.",
         variant: "destructive",
       });
       return;
@@ -69,22 +69,21 @@ export const MovimentacoesPagarme = () => {
     }
 
     if (!validateApiKey(apiKey)) {
-      throw new Error('Formato da chave API inválido. Deve começar com "sk_"');
+      throw new Error('Formato da chave API inválido. Deve começar com "sk_test_" ou "sk_live_"');
     }
 
-    console.log(`🚀 Iniciando requisição para: ${endpoint}`);
-    console.log(`🔑 Usando chave API: ${apiKey.substring(0, 10)}...`);
+    console.log(`🚀 Fazendo requisição para: ${endpoint}`);
+    console.log(`🔑 API Key: ${apiKey.substring(0, 15)}...`);
     
     try {
       const requestBody = {
         endpoint,
-        apiKey
+        apiKey: apiKey.trim()
       };
       
-      console.log('📤 Enviando dados para Edge Function:', {
+      console.log('📤 Enviando para Edge Function:', {
         endpoint: endpoint,
-        apiKeyLength: apiKey.length,
-        apiKeyPrefix: apiKey.substring(0, 5) + '...'
+        apiKeyPrefix: apiKey.substring(0, 15) + '...'
       });
 
       const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
@@ -95,46 +94,20 @@ export const MovimentacoesPagarme = () => {
 
       if (error) {
         console.error('❌ Erro na Edge Function:', error);
-        
-        // Tentar extrair mais informações do erro
-        let errorMessage = error.message || 'Erro desconhecido';
-        
-        if (error.message?.includes('401')) {
-          errorMessage = 'Chave API inválida. Verifique se é uma chave SECRET (sk_) válida da Pagar.me';
-        } else if (error.message?.includes('403')) {
-          errorMessage = 'Acesso negado. Sua chave API não tem as permissões necessárias';
-        } else if (error.message?.includes('404')) {
-          errorMessage = 'Endpoint não encontrado. Verifique se a URL está correta';
-        } else if (error.message?.includes('500')) {
-          errorMessage = 'Erro interno da API Pagar.me. Tente novamente em alguns minutos';
-        }
-        
-        throw new Error(errorMessage);
+        throw new Error(error.message || 'Erro na comunicação com a API');
       }
 
       if (data?.error) {
-        console.error('❌ Erro retornado pela API:', data);
+        console.error('❌ Erro da API Pagar.me:', data);
         throw new Error(data.details || data.error);
       }
 
-      console.log('✅ Dados recebidos com sucesso:', data);
+      console.log('✅ Sucesso! Dados recebidos:', data);
       return data;
       
     } catch (error: any) {
       console.error('💥 Erro na requisição:', error);
-      
-      // Melhorar mensagens de erro
-      let friendlyMessage = error.message;
-      
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        friendlyMessage = 'Erro de conexão. Verifique sua internet e tente novamente';
-      } else if (error.message?.includes('JSON')) {
-        friendlyMessage = 'Erro ao processar resposta da API. Tente novamente';
-      } else if (error.message?.includes('timeout')) {
-        friendlyMessage = 'Tempo limite excedido. Tente novamente';
-      }
-      
-      throw new Error(friendlyMessage);
+      throw new Error(error.message || 'Erro desconhecido');
     }
   };
 
@@ -151,7 +124,7 @@ export const MovimentacoesPagarme = () => {
     if (!validateApiKey(apiKey)) {
       toast({
         title: "Formato inválido",
-        description: "A chave da API deve começar com 'sk_' e ter o formato correto da Pagar.me.",
+        description: "A chave da API deve começar com 'sk_test_' ou 'sk_live_'.",
         variant: "destructive",
       });
       return;
@@ -161,12 +134,12 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 Testando conexão com a API Pagar.me...');
+      console.log('🔄 Testando conexão com endpoint de recebíveis...');
       
-      // Primeiro tentar um endpoint simples
-      const data = await makeApiRequest('/core/v5/balance');
+      // Usar endpoint de recebíveis para teste conforme documentação
+      const data = await makeApiRequest('/core/v5/payables?count=1');
       
-      console.log('✅ Conexão estabelecida com sucesso!');
+      console.log('✅ Conexão estabelecida! Dados recebidos:', data);
       setConnectionStatus('connected');
       
       toast({
@@ -207,13 +180,13 @@ export const MovimentacoesPagarme = () => {
     });
   };
 
-  const fetchOperations = async () => {
+  const fetchPayables = async () => {
     try {
-      console.log('📈 Buscando operações...');
-      const data = await makeApiRequest('/core/v5/balance/operations');
+      console.log('💰 Buscando recebíveis (payables)...');
+      const data = await makeApiRequest('/core/v5/payables?count=25');
       return data.data || [];
     } catch (error) {
-      console.error('❌ Erro ao buscar operações:', error);
+      console.error('❌ Erro ao buscar recebíveis:', error);
       throw error;
     }
   };
@@ -221,7 +194,7 @@ export const MovimentacoesPagarme = () => {
   const fetchTransactions = async () => {
     try {
       console.log('💳 Buscando transações...');
-      const data = await makeApiRequest('/core/v5/transactions');
+      const data = await makeApiRequest('/core/v5/transactions?count=25');
       return data.data || [];
     } catch (error) {
       console.error('❌ Erro ao buscar transações:', error);
@@ -243,18 +216,30 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 Iniciando busca de dados...');
-      const [operationsData, transactionsData] = await Promise.all([
-        fetchOperations(),
+      console.log('🔄 Buscando dados da Pagar.me...');
+      
+      const [payablesData, transactionsData] = await Promise.all([
+        fetchPayables(),
         fetchTransactions()
       ]);
       
-      setOperations(operationsData);
+      // Converter payables para operations format
+      const operationsFromPayables = payablesData.map((payable: any) => ({
+        id: payable.id,
+        type: payable.type || 'credit',
+        status: payable.status,
+        amount: payable.amount,
+        fee: payable.fee || 0,
+        created_at: payable.created_at,
+        description: `Recebível - ${payable.type || 'N/A'}`
+      }));
+      
+      setOperations(operationsFromPayables);
       setTransactions(transactionsData);
       
       toast({
         title: "Dados carregados",
-        description: `${operationsData.length} operações e ${transactionsData.length} transações carregadas.`,
+        description: `${operationsFromPayables.length} recebíveis e ${transactionsData.length} transações carregadas.`,
       });
       
     } catch (error: any) {
@@ -304,11 +289,11 @@ export const MovimentacoesPagarme = () => {
               <div>
                 <p className="font-medium">⚠️ Chave API não configurada</p>
                 <p className="text-sm mt-1">
-                  Configure sua chave <strong>SECRET</strong> da API Pagar.me (sk_...) para visualizar os dados reais, 
-                  ou clique em "Demo" para ver dados de exemplo.
+                  Configure sua chave <strong>SECRET</strong> da API Pagar.me (sk_test_... ou sk_live_...) 
+                  para visualizar os dados reais, ou clique em "Demo" para ver dados de exemplo.
                 </p>
                 <p className="text-xs mt-2 opacity-75">
-                  💡 Certifique-se de usar uma chave SECRET (sk_) e não PUBLIC (pk_)
+                  💡 Use sk_test_ para testes e sk_live_ para produção
                 </p>
               </div>
             </div>

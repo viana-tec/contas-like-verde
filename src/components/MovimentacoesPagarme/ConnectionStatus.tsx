@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, RefreshCw, XCircle, AlertCircle, Key, Globe, Shield } from 'lucide-react';
+import { CheckCircle, RefreshCw, XCircle, AlertCircle, Key, Globe, Shield, ExternalLink } from 'lucide-react';
 import { ConnectionStatus as ConnectionStatusType } from './types';
 
 interface ConnectionStatusProps {
@@ -84,28 +84,28 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
               <div className="p-4 bg-blue-900/20 border border-blue-600 rounded-lg">
                 <p className="text-blue-400 text-sm font-medium mb-2 flex items-center gap-2">
                   <Key size={16} />
-                  Verificações da Chave API:
+                  Formato correto da chave API:
                 </p>
                 <ul className="text-blue-300 text-xs space-y-1">
-                  <li>• Deve começar com "sk_" (SECRET key)</li>
-                  <li>• Não use "pk_" (PUBLIC key)</li>
-                  <li>• Deve ter pelo menos 32 caracteres</li>
+                  <li>🧪 <strong>Teste:</strong> sk_test_xxxxxxxxxx</li>
+                  <li>🚀 <strong>Produção:</strong> sk_live_xxxxxxxxxx</li>
+                  <li>• Deve ter pelo menos 20 caracteres</li>
                   <li>• Deve estar ativa no dashboard Pagar.me</li>
-                  <li>• Deve ter permissões para balance e transactions</li>
+                  <li>• Deve ter permissões para payables e transactions</li>
                 </ul>
               </div>
 
               <div className="p-4 bg-purple-900/20 border border-purple-600 rounded-lg">
                 <p className="text-purple-400 text-sm font-medium mb-2 flex items-center gap-2">
                   <Globe size={16} />
-                  Outros problemas possíveis:
+                  Problemas comuns:
                 </p>
                 <ul className="text-purple-300 text-xs space-y-1">
-                  <li>• Conta Pagar.me suspensa ou inativa</li>
-                  <li>• Problemas temporários na API</li>
-                  <li>• Limites de rate limiting excedidos</li>
-                  <li>• Conexão de internet instável</li>
-                  <li>• Firewall bloqueando requisições</li>
+                  <li>• Chave expirada ou inativa</li>
+                  <li>• Conta Pagar.me suspensa</li>
+                  <li>• Limites de API excedidos</li>
+                  <li>• Problemas de conectividade</li>
+                  <li>• Chave com permissões limitadas</li>
                 </ul>
               </div>
             </div>
@@ -113,14 +113,27 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
             <div className="p-4 bg-green-900/20 border border-green-600 rounded-lg">
               <p className="text-green-400 text-sm font-medium mb-2 flex items-center gap-2">
                 <Shield size={16} />
-                Soluções recomendadas:
+                Como resolver:
               </p>
               <ul className="text-green-300 text-xs space-y-1">
-                <li>🔑 <strong>Verifique sua chave:</strong> Acesse o dashboard Pagar.me e copie uma chave SECRET válida</li>
-                <li>📊 <strong>Use dados demo:</strong> Clique em "Demo" para testar a interface com dados de exemplo</li>
-                <li>🔄 <strong>Tente novamente:</strong> Problemas temporários podem ser resolvidos aguardando alguns minutos</li>
-                <li>📞 <strong>Suporte Pagar.me:</strong> Se o problema persistir, entre em contato com o suporte</li>
+                <li>🔑 <strong>Dashboard Pagar.me:</strong> Acesse e copie uma chave SECRET válida</li>
+                <li>🧪 <strong>Use sk_test_:</strong> Para testes use sempre chaves de teste</li>
+                <li>📊 <strong>Modo Demo:</strong> Clique em "Demo" para testar a interface</li>
+                <li>🔄 <strong>Aguarde:</strong> Problemas temporários podem se resolver sozinhos</li>
+                <li>📞 <strong>Suporte:</strong> Contate o suporte da Pagar.me se persistir</li>
               </ul>
+              
+              <div className="mt-3 pt-3 border-t border-green-700">
+                <a 
+                  href="https://dashboard.pagar.me/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-green-300 hover:text-green-200 text-xs"
+                >
+                  <ExternalLink size={12} />
+                  Acessar Dashboard Pagar.me
+                </a>
+              </div>
             </div>
           </div>
         )}

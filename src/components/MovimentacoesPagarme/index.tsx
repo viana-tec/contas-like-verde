@@ -29,9 +29,13 @@ export const MovimentacoesPagarme = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const { toast } = useToast();
 
-  // Função para validar formato da chave API Pagar.me
+  // Função para validar formato da chave API Pagar.me (baseada na documentação oficial)
   const validateApiKey = (key: string): boolean => {
-    return key.startsWith('sk_test_') || key.startsWith('sk_live_');
+    if (!key || typeof key !== 'string') {
+      return false;
+    }
+    // Pagar.me aceita diferentes formatos, mas deve ter pelo menos 20 caracteres
+    return key.trim().length >= 20;
   };
 
   const saveApiKey = () => {
@@ -47,7 +51,7 @@ export const MovimentacoesPagarme = () => {
     if (!validateApiKey(apiKey)) {
       toast({
         title: "Formato inválido", 
-        description: "A chave da API deve começar com 'sk_test_' ou 'sk_live_'.",
+        description: "A chave da API deve ter pelo menos 20 caracteres.",
         variant: "destructive",
       });
       return;
@@ -69,11 +73,11 @@ export const MovimentacoesPagarme = () => {
     }
 
     if (!validateApiKey(apiKey)) {
-      throw new Error('Formato da chave API inválido. Deve começar com "sk_test_" ou "sk_live_"');
+      throw new Error('Formato da chave API inválido. Deve ter pelo menos 20 caracteres');
     }
 
-    console.log(`🚀 Fazendo requisição para: ${endpoint}`);
-    console.log(`🔑 API Key: ${apiKey.substring(0, 15)}...`);
+    console.log(`🚀 [FRONTEND] Fazendo requisição para: ${endpoint}`);
+    console.log(`🔑 [FRONTEND] API Key: ${apiKey.substring(0, 15)}...`);
     
     try {
       const requestBody = {
@@ -81,32 +85,42 @@ export const MovimentacoesPagarme = () => {
         apiKey: apiKey.trim()
       };
       
-      console.log('📤 Enviando para Edge Function:', {
+      console.log('📤 [FRONTEND] Enviando para Edge Function:', {
         endpoint: endpoint,
-        apiKeyPrefix: apiKey.substring(0, 15) + '...'
+        apiKeyPrefix: apiKey.substring(0, 15) + '...',
+        bodySize: JSON.stringify(requestBody).length
       });
 
       const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
         body: requestBody
       });
 
-      console.log('📥 Resposta da Edge Function:', { data, error });
+      console.log('📥 [FRONTEND] Resposta da Edge Function:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        dataType: typeof data,
+        errorType: typeof error
+      });
 
       if (error) {
-        console.error('❌ Erro na Edge Function:', error);
+        console.error('❌ [FRONTEND] Erro na Edge Function:', error);
         throw new Error(error.message || 'Erro na comunicação com a API');
       }
 
       if (data?.error) {
-        console.error('❌ Erro da API Pagar.me:', data);
+        console.error('❌ [FRONTEND] Erro da API Pagar.me:', data);
         throw new Error(data.details || data.error);
       }
 
-      console.log('✅ Sucesso! Dados recebidos:', data);
+      console.log('✅ [FRONTEND] Sucesso! Dados recebidos:', {
+        dataType: typeof data,
+        hasDataArray: !!data?.data,
+        arrayLength: Array.isArray(data?.data) ? data.data.length : 'N/A'
+      });
       return data;
       
     } catch (error: any) {
-      console.error('💥 Erro na requisição:', error);
+      console.error('💥 [FRONTEND] Erro na requisição:', error);
       throw new Error(error.message || 'Erro desconhecido');
     }
   };
@@ -124,7 +138,7 @@ export const MovimentacoesPagarme = () => {
     if (!validateApiKey(apiKey)) {
       toast({
         title: "Formato inválido",
-        description: "A chave da API deve começar com 'sk_test_' ou 'sk_live_'.",
+        description: "A chave da API deve ter pelo menos 20 caracteres.",
         variant: "destructive",
       });
       return;
@@ -134,12 +148,12 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 Testando conexão com endpoint de recebíveis...');
+      console.log('🔄 [FRONTEND] Testando conexão com endpoint de recebíveis...');
       
-      // Usar endpoint de recebíveis para teste conforme documentação
+      // Usar endpoint de recebíveis conforme documentação oficial
       const data = await makeApiRequest('/core/v5/payables?count=1');
       
-      console.log('✅ Conexão estabelecida! Dados recebidos:', data);
+      console.log('✅ [FRONTEND] Conexão estabelecida! Dados recebidos:', data);
       setConnectionStatus('connected');
       
       toast({
@@ -151,7 +165,7 @@ export const MovimentacoesPagarme = () => {
       await fetchData();
       
     } catch (error: any) {
-      console.error('❌ Erro na conexão:', error);
+      console.error('❌ [FRONTEND] Erro na conexão:', error);
       setConnectionStatus('error');
       setErrorDetails(error.message);
       
@@ -164,7 +178,7 @@ export const MovimentacoesPagarme = () => {
   };
 
   const loadDemoData = () => {
-    console.log('📊 Carregando dados de demonstração...');
+    console.log('📊 [FRONTEND] Carregando dados de demonstração...');
     
     const mockOperations = getMockOperations();
     const mockTransactions = getMockTransactions();
@@ -182,22 +196,24 @@ export const MovimentacoesPagarme = () => {
 
   const fetchPayables = async () => {
     try {
-      console.log('💰 Buscando recebíveis (payables)...');
+      console.log('💰 [FRONTEND] Buscando recebíveis (payables)...');
       const data = await makeApiRequest('/core/v5/payables?count=25');
+      console.log('📊 [FRONTEND] Recebíveis retornados:', data);
       return data.data || [];
     } catch (error) {
-      console.error('❌ Erro ao buscar recebíveis:', error);
+      console.error('❌ [FRONTEND] Erro ao buscar recebíveis:', error);
       throw error;
     }
   };
 
   const fetchTransactions = async () => {
     try {
-      console.log('💳 Buscando transações...');
+      console.log('💳 [FRONTEND] Buscando transações...');
       const data = await makeApiRequest('/core/v5/transactions?count=25');
+      console.log('📊 [FRONTEND] Transações retornadas:', data);
       return data.data || [];
     } catch (error) {
-      console.error('❌ Erro ao buscar transações:', error);
+      console.error('❌ [FRONTEND] Erro ao buscar transações:', error);
       throw error;
     }
   };
@@ -216,15 +232,20 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 Buscando dados da Pagar.me...');
+      console.log('🔄 [FRONTEND] Buscando dados da Pagar.me...');
       
       const [payablesData, transactionsData] = await Promise.all([
         fetchPayables(),
         fetchTransactions()
       ]);
       
+      console.log('📊 [FRONTEND] Dados processados:', {
+        payables: payablesData?.length || 0,
+        transactions: transactionsData?.length || 0
+      });
+      
       // Converter payables para operations format
-      const operationsFromPayables = payablesData.map((payable: any) => ({
+      const operationsFromPayables = (payablesData || []).map((payable: any) => ({
         id: payable.id,
         type: payable.type || 'credit',
         status: payable.status,
@@ -235,15 +256,15 @@ export const MovimentacoesPagarme = () => {
       }));
       
       setOperations(operationsFromPayables);
-      setTransactions(transactionsData);
+      setTransactions(transactionsData || []);
       
       toast({
         title: "Dados carregados",
-        description: `${operationsFromPayables.length} recebíveis e ${transactionsData.length} transações carregadas.`,
+        description: `${operationsFromPayables.length} recebíveis e ${(transactionsData || []).length} transações carregadas.`,
       });
       
     } catch (error: any) {
-      console.error('❌ Erro ao buscar dados:', error);
+      console.error('❌ [FRONTEND] Erro ao buscar dados:', error);
       setErrorDetails(error.message);
       setConnectionStatus('error');
       
@@ -289,11 +310,11 @@ export const MovimentacoesPagarme = () => {
               <div>
                 <p className="font-medium">⚠️ Chave API não configurada</p>
                 <p className="text-sm mt-1">
-                  Configure sua chave <strong>SECRET</strong> da API Pagar.me (sk_test_... ou sk_live_...) 
-                  para visualizar os dados reais, ou clique em "Demo" para ver dados de exemplo.
+                  Configure sua chave da API Pagar.me para visualizar os dados reais, 
+                  ou clique em "Demo" para ver dados de exemplo.
                 </p>
                 <p className="text-xs mt-2 opacity-75">
-                  💡 Use sk_test_ para testes e sk_live_ para produção
+                  💡 A chave deve ter pelo menos 20 caracteres e estar ativa no dashboard da Pagar.me
                 </p>
               </div>
             </div>

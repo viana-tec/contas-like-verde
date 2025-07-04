@@ -84,14 +84,14 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
               <div className="p-4 bg-blue-900/20 border border-blue-600 rounded-lg">
                 <p className="text-blue-400 text-sm font-medium mb-2 flex items-center gap-2">
                   <Key size={16} />
-                  Formato correto da chave API:
+                  Sobre as chaves da Pagar.me:
                 </p>
                 <ul className="text-blue-300 text-xs space-y-1">
-                  <li>🧪 <strong>Teste:</strong> sk_test_xxxxxxxxxx</li>
-                  <li>🚀 <strong>Produção:</strong> sk_live_xxxxxxxxxx</li>
-                  <li>• Deve ter pelo menos 20 caracteres</li>
-                  <li>• Deve estar ativa no dashboard Pagar.me</li>
-                  <li>• Deve ter permissões para payables e transactions</li>
+                  <li>🔑 <strong>Chaves de API:</strong> Obtidas no dashboard Pagar.me</li>
+                  <li>📏 <strong>Tamanho:</strong> Deve ter pelo menos 20 caracteres</li>
+                  <li>✅ <strong>Status:</strong> Deve estar ativa na sua conta</li>
+                  <li>🔐 <strong>Tipo:</strong> Usar chaves de produção ou teste</li>
+                  <li>🎯 <strong>Permissões:</strong> Deve ter acesso a payables e transactions</li>
                 </ul>
               </div>
 
@@ -101,11 +101,12 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
                   Problemas comuns:
                 </p>
                 <ul className="text-purple-300 text-xs space-y-1">
-                  <li>• Chave expirada ou inativa</li>
-                  <li>• Conta Pagar.me suspensa</li>
-                  <li>• Limites de API excedidos</li>
+                  <li>• Chave inválida ou não encontrada</li>
+                  <li>• Conta Pagar.me inativa ou suspensa</li>
+                  <li>• Limites de requisições excedidos</li>
                   <li>• Problemas de conectividade</li>
-                  <li>• Chave com permissões limitadas</li>
+                  <li>• Chave sem permissões necessárias</li>
+                  <li>• Formato incorreto da chave API</li>
                 </ul>
               </div>
             </div>
@@ -116,11 +117,12 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
                 Como resolver:
               </p>
               <ul className="text-green-300 text-xs space-y-1">
-                <li>🔑 <strong>Dashboard Pagar.me:</strong> Acesse e copie uma chave SECRET válida</li>
-                <li>🧪 <strong>Use sk_test_:</strong> Para testes use sempre chaves de teste</li>
-                <li>📊 <strong>Modo Demo:</strong> Clique em "Demo" para testar a interface</li>
-                <li>🔄 <strong>Aguarde:</strong> Problemas temporários podem se resolver sozinhos</li>
-                <li>📞 <strong>Suporte:</strong> Contate o suporte da Pagar.me se persistir</li>
+                <li>🔑 <strong>Dashboard:</strong> Acesse o dashboard da Pagar.me e copie uma chave válida</li>
+                <li>✅ <strong>Verificar:</strong> Confirme se a chave está ativa e com permissões</li>
+                <li>📊 <strong>Demo:</strong> Use o modo "Demo" para testar a interface</li>
+                <li>🔄 <strong>Aguardar:</strong> Problemas temporários podem se resolver automaticamente</li>
+                <li>🔍 <strong>Logs:</strong> Verifique o console do navegador para mais detalhes</li>
+                <li>📞 <strong>Suporte:</strong> Contate o suporte da Pagar.me se o problema persistir</li>
               </ul>
               
               <div className="mt-3 pt-3 border-t border-green-700">
@@ -128,10 +130,19 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
                   href="https://dashboard.pagar.me/" 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-green-300 hover:text-green-200 text-xs mr-4"
+                >
+                  <ExternalLink size={12} />
+                  Dashboard Pagar.me
+                </a>
+                <a 
+                  href="https://docs.pagar.me/docs/chaves-de-acesso" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-green-300 hover:text-green-200 text-xs"
                 >
                   <ExternalLink size={12} />
-                  Acessar Dashboard Pagar.me
+                  Documentação das Chaves
                 </a>
               </div>
             </div>

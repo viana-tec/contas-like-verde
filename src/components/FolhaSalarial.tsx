@@ -118,10 +118,18 @@ export const FolhaSalarial: React.FC = () => {
 
     try {
       const employeeData = {
-        ...cltFormData,
+        name: cltFormData.name,
+        document: cltFormData.document,
+        position: cltFormData.position,
         base_salary: Number(cltFormData.base_salary),
+        hire_date: cltFormData.hire_date || new Date().toISOString().split('T')[0],
         salary_advance: Number(cltFormData.salary_advance || 0),
-        status: cltFormData.status || 'active'
+        payment_day_1: cltFormData.payment_day_1 || 15,
+        payment_day_2: cltFormData.payment_day_2 || 30,
+        status: cltFormData.status || 'active',
+        email: cltFormData.email || null,
+        phone: cltFormData.phone || null,
+        pix_key: cltFormData.pix_key || null
       };
 
       if (editingEmployee) {
@@ -167,9 +175,16 @@ export const FolhaSalarial: React.FC = () => {
 
     try {
       const providerData = {
-        ...providerFormData,
+        name: providerFormData.name,
+        document: providerFormData.document,
+        service_type: providerFormData.service_type,
         monthly_amount: Number(providerFormData.monthly_amount),
-        status: providerFormData.status || 'active'
+        payment_day_1: providerFormData.payment_day_1 || 15,
+        payment_day_2: providerFormData.payment_day_2 || 30,
+        status: providerFormData.status || 'active',
+        email: providerFormData.email || null,
+        phone: providerFormData.phone || null,
+        pix_key: providerFormData.pix_key || null
       };
 
       if (editingProvider) {

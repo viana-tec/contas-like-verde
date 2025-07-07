@@ -60,7 +60,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="name"
                   value={cltFormData.name || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, name: e.target.value })}
                   placeholder="Nome completo"
                 />
               </div>
@@ -69,7 +69,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="document"
                   value={cltFormData.document || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, document: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, document: e.target.value })}
                   placeholder="000.000.000-00"
                 />
               </div>
@@ -80,7 +80,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="position"
                   value={cltFormData.position || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, position: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, position: e.target.value })}
                   placeholder="Cargo ou função"
                 />
               </div>
@@ -90,7 +90,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   id="hire_date"
                   type="date"
                   value={cltFormData.hire_date || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, hire_date: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, hire_date: e.target.value })}
                 />
               </div>
             </div>
@@ -102,7 +102,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   type="number"
                   step="0.01"
                   value={cltFormData.base_salary || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, base_salary: parseFloat(e.target.value) }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, base_salary: parseFloat(e.target.value) })}
                   placeholder="0.00"
                 />
               </div>
@@ -113,7 +113,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   type="number"
                   step="0.01"
                   value={cltFormData.salary_advance || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, salary_advance: parseFloat(e.target.value) }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, salary_advance: parseFloat(e.target.value) })}
                   placeholder="0.00"
                 />
               </div>
@@ -122,7 +122,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <select
                   id="status"
                   value={cltFormData.status || 'active'}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, status: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, status: e.target.value })}
                   className="w-full p-2 border rounded"
                 >
                   <option value="active">Ativo</option>
@@ -139,7 +139,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   min="1"
                   max="31"
                   value={cltFormData.payment_day_1 || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, payment_day_1: parseInt(e.target.value) }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, payment_day_1: parseInt(e.target.value) })}
                   placeholder="15"
                 />
               </div>
@@ -151,7 +151,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   min="1"
                   max="31"
                   value={cltFormData.payment_day_2 || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, payment_day_2: parseInt(e.target.value) }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, payment_day_2: parseInt(e.target.value) })}
                   placeholder="30"
                 />
               </div>
@@ -163,7 +163,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   id="email"
                   type="email"
                   value={cltFormData.email || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, email: e.target.value })}
                   placeholder="email@exemplo.com"
                 />
               </div>
@@ -172,7 +172,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="phone"
                   value={cltFormData.phone || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, phone: e.target.value })}
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -181,7 +181,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="pix_key"
                   value={cltFormData.pix_key || ''}
-                  onChange={(e) => setCltFormData(prev => ({ ...prev, pix_key: e.target.value }))}
+                  onChange={(e) => setCltFormData({ ...cltFormData, pix_key: e.target.value })}
                   placeholder="CPF, email, telefone..."
                 />
               </div>
@@ -206,7 +206,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="provider_name"
                   value={providerFormData.name || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, name: e.target.value })}
                   placeholder="Nome completo"
                 />
               </div>
@@ -215,7 +215,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="provider_document"
                   value={providerFormData.document || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, document: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, document: e.target.value })}
                   placeholder="000.000.000-00"
                 />
               </div>
@@ -226,7 +226,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="service_type"
                   value={providerFormData.service_type || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, service_type: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, service_type: e.target.value })}
                   placeholder="Ex: Consultoria, Desenvolvimento..."
                 />
               </div>
@@ -237,7 +237,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   type="number"
                   step="0.01"
                   value={providerFormData.monthly_amount || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, monthly_amount: parseFloat(e.target.value) }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, monthly_amount: parseFloat(e.target.value) })}
                   placeholder="0.00"
                 />
               </div>
@@ -251,7 +251,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   min="1"
                   max="31"
                   value={providerFormData.payment_day_1 || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, payment_day_1: parseInt(e.target.value) }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, payment_day_1: parseInt(e.target.value) })}
                   placeholder="15"
                 />
               </div>
@@ -263,7 +263,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   min="1"
                   max="31"
                   value={providerFormData.payment_day_2 || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, payment_day_2: parseInt(e.target.value) }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, payment_day_2: parseInt(e.target.value) })}
                   placeholder="30"
                 />
               </div>
@@ -275,7 +275,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                   id="provider_email"
                   type="email"
                   value={providerFormData.email || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, email: e.target.value })}
                   placeholder="email@exemplo.com"
                 />
               </div>
@@ -284,7 +284,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="provider_phone"
                   value={providerFormData.phone || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, phone: e.target.value })}
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -293,7 +293,7 @@ export const FolhaSalarialModal: React.FC<FolhaSalarialModalProps> = ({
                 <Input
                   id="provider_pix_key"
                   value={providerFormData.pix_key || ''}
-                  onChange={(e) => setProviderFormData(prev => ({ ...prev, pix_key: e.target.value }))}
+                  onChange={(e) => setProviderFormData({ ...providerFormData, pix_key: e.target.value })}
                   placeholder="CPF, email, telefone..."
                 />
               </div>

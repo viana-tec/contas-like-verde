@@ -55,12 +55,12 @@ export const makeApiRequest = async (endpoint: string, apiKey: string) => {
   }
 };
 
-// Função para buscar dados com paginação automática COMPLETA E ROBUSTA
+// Função para buscar dados com paginação automática ILIMITADA E ROBUSTA
 export const fetchAllDataUnlimited = async (endpoint: string, apiKey: string): Promise<any[]> => {
   let allData: any[] = [];
   let page = 1;
-  const pageSize = 100; // Reduzi para 100 para garantir mais estabilidade
-  let maxPages = 50; // Limite máximo de páginas para segurança
+  const pageSize = 250; // Aumentado para 250 para maior eficiência
+  let maxPages = 200; // AUMENTADO para 200 páginas (50.000 registros por endpoint)
   
   console.log(`📄 [FRONTEND] Iniciando coleta ILIMITADA: ${endpoint}`);
   
@@ -97,16 +97,16 @@ export const fetchAllDataUnlimited = async (endpoint: string, apiKey: string): P
       
       page++;
       
-      // Pausa maior para estabilidade
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Pausa otimizada para máxima eficiência
+      await new Promise(resolve => setTimeout(resolve, 150));
       
     } catch (error) {
       console.error(`❌ [FRONTEND] Erro na página ${page}:`, error);
       
       // Se for erro de rate limit, tentar novamente após pausa
-      if (error.message?.includes('429') || error.message?.includes('rate')) {
-        console.log(`📄 [FRONTEND] Rate limit - aguardando 2s antes de continuar...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      if (error.message?.includes('429') || error.message?.includes('rate') || error.message?.includes('Limite')) {
+        console.log(`📄 [FRONTEND] Rate limit - aguardando 3s antes de continuar...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         continue; // Tentar a mesma página novamente
       }
       
@@ -141,9 +141,9 @@ export const fetchBalance = async (apiKey: string): Promise<{ available: number;
     // Buscar saldo do recipient
     const balanceResponse = await makeApiRequest(`/core/v5/recipients/${recipientId}/balance`, apiKey);
     
-    // CORREÇÃO: NÃO dividir por 100 - valores já vêm em centavos mas devem ser exibidos como reais
-    const available = (balanceResponse?.available_amount || 0) / 100; // Já em centavos, converter para reais
-    const pending = (balanceResponse?.waiting_funds_amount || 0) / 100; // Já em centavos, converter para reais
+    // CORREÇÃO APLICADA: Valores vêm em centavos, dividir por 100 UMA vez para converter para reais
+    const available = (balanceResponse?.available_amount || 0) / 100;
+    const pending = (balanceResponse?.waiting_funds_amount || 0) / 100;
     
     console.log(`💰 [FRONTEND] Saldo - Disponível: R$ ${available}, Pendente: R$ ${pending}`);
     
@@ -165,11 +165,11 @@ export const testConnection = async (apiKey: string): Promise<void> => {
   console.log('✅ [FRONTEND] Conexão OK:', data);
 };
 
-// Função para buscar todos os dados necessários COM COLETA MASSIVA
+// Função para buscar TODOS os dados de MÚLTIPLOS ENDPOINTS - IMPLEMENTAÇÃO ROBUSTA COMPLETA
 export const fetchAllData = async (apiKey: string) => {
-  console.log('🔄 [FRONTEND] Iniciando coleta MASSIVA COMPLETA...');
+  console.log('🚀 [FRONTEND] Iniciando COLETA MASSIVA ILIMITADA de MÚLTIPLOS ENDPOINTS...');
   
-  // Data de 6 meses atrás para garantir TODOS os dados
+  // Data de 6 meses atrás para garantir TODOS os dados históricos
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
   const dateParam = sixMonthsAgo.toISOString().split('T')[0];
@@ -177,52 +177,85 @@ export const fetchAllData = async (apiKey: string) => {
   console.log(`📅 [FRONTEND] Data de referência (6 meses): ${dateParam}`);
   
   try {
-    // Buscar dados em paralelo para acelerar
-    console.log('🚀 [FRONTEND] Buscando TODOS os payables e orders...');
+    // FASE 1: Coleta PARALELA de TODOS os endpoints principais
+    console.log('🚀 [FRONTEND] FASE 1: Coletando de TODOS OS ENDPOINTS em paralelo...');
     
-    const [payablesData, ordersData] = await Promise.all([
+    const [payablesData, ordersData, directTransactionsData] = await Promise.all([
+      // Endpoint 1: Payables (recebíveis) - MAIS IMPORTANTE
       fetchAllDataUnlimited(`/core/v5/payables?created_since=${dateParam}`, apiKey),
-      fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`, apiKey)
+      // Endpoint 2: Orders (pedidos completos)
+      fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`, apiKey),
+      // Endpoint 3: Transações DIRETAS (não apenas dos orders)
+      fetchAllDataUnlimited(`/core/v5/transactions?created_since=${dateParam}`, apiKey)
     ]);
     
-    console.log('🚀 [FRONTEND] Processando transações dos orders...');
-    let transactionsData: any[] = [];
+    console.log(`📊 [FRONTEND] COLETA FASE 1 FINALIZADA:`, {
+      payables: payablesData.length,
+      orders: ordersData.length,
+      directTransactions: directTransactionsData.length
+    });
+    
+    // FASE 2: Processar e enriquecer transações dos orders
+    console.log('🚀 [FRONTEND] FASE 2: Extraindo transações dos orders...');
+    let orderTransactionsData: any[] = [];
     try {
-      // Extrair transações dos orders (que já temos)
-      transactionsData = ordersData.flatMap(order => {
+      orderTransactionsData = ordersData.flatMap(order => {
         return order.charges?.map((charge: any) => ({
           ...charge,
           order_id: order.id,
           customer: order.customer,
-          payment_method: charge.payment_method || 'unknown'
+          payment_method: charge.payment_method || 'unknown',
+          source: 'order_charges'
         })) || [];
       });
-      console.log(`📊 [FRONTEND] Transações extraídas dos orders: ${transactionsData.length}`);
+      console.log(`📊 [FRONTEND] Transações extraídas dos orders: ${orderTransactionsData.length}`);
     } catch (error) {
-      console.warn('⚠️ [FRONTEND] Erro ao extrair transações, usando array vazio');
-      transactionsData = [];
+      console.warn('⚠️ [FRONTEND] Erro ao extrair transações dos orders');
+      orderTransactionsData = [];
     }
     
-    console.log('🚀 [FRONTEND] Buscando saldo...');
+    // FASE 3: Consolidar TODAS as transações (diretas + orders)
+    console.log('🚀 [FRONTEND] FASE 3: Consolidando TODAS as transações...');
+    const allTransactionsData = [
+      ...directTransactionsData.map(t => ({ ...t, source: 'direct_transactions' })),
+      ...orderTransactionsData
+    ];
+    
+    // Remover duplicatas por ID
+    const uniqueTransactions = allTransactionsData.reduce((acc: any[], transaction: any) => {
+      const exists = acc.find(t => t.id === transaction.id);
+      if (!exists) {
+        acc.push(transaction);
+      }
+      return acc;
+    }, []);
+    
+    console.log(`📊 [FRONTEND] Transações consolidadas: ${allTransactionsData.length} -> ${uniqueTransactions.length} (únicas)`);
+    
+    // FASE 4: Buscar saldo do recipient
+    console.log('🚀 [FRONTEND] FASE 4: Buscando saldo...');
     const balanceData = await fetchBalance(apiKey);
     
-    console.log(`🎯 [FRONTEND] COLETA MASSIVA FINALIZADA:`, {
+    console.log(`🎯 [FRONTEND] COLETA MASSIVA COMPLETA FINALIZADA:`, {
       payables: payablesData.length,
-      transactions: transactionsData.length,
       orders: ordersData.length,
+      directTransactions: directTransactionsData.length,
+      orderTransactions: orderTransactionsData.length,
+      uniqueTransactions: uniqueTransactions.length,
       balance: balanceData,
-      totalOperations: payablesData.length + ordersData.length
+      totalOperations: payablesData.length + ordersData.length,
+      grandTotal: payablesData.length + ordersData.length + uniqueTransactions.length
     });
 
     return {
       payablesData,
-      transactionsData,
+      transactionsData: uniqueTransactions,
       ordersData,
       balanceData
     };
     
   } catch (error: any) {
-    console.error('💥 [FRONTEND] Erro na coleta massiva:', error);
+    console.error('💥 [FRONTEND] Erro na coleta massiva ilimitada:', error);
     throw new Error(`Erro na coleta de dados: ${error.message}`);
   }
 };

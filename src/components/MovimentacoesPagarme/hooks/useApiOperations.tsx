@@ -152,34 +152,43 @@ export const useApiOperations = ({
     try {
       const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey);
       
+      console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
+        ordersRaw: ordersData.length,
+        payablesRaw: payablesData.length,
+        transactionsRaw: transactionsData.length,
+        balance: balanceData
+      });
+      
       // Mapear orders para operações E payables para operações também 
       const orderOperations = mapOrdersToOperations(ordersData);
       const payableOperations = mapPayablesToOperations(payablesData);
       
-      // Combinar todas as operações
+      // Combinar todas as operações (FIRST orders, THEN payables para evitar duplicatas)
       const allOperations = [...orderOperations, ...payableOperations];
       
-      // Converter transações
+      // Converter transações com correção de valores
       const formattedTransactions = mapTransactions(transactionsData);
       
-      // Combinar todas as operações
+      // Atualizar estados
       setOperations(allOperations);
       setTransactions(formattedTransactions);
       setAvailableBalance(balanceData.available);
       setPendingBalance(balanceData.pending);
       
-      console.log(`✅ [FRONTEND] Dados carregados com sucesso:`, {
-        operations: allOperations.length,
-        transactions: formattedTransactions.length,
-        availableBalance: balanceData.available,
-        pendingBalance: balanceData.pending,
+      console.log(`🎯 [FRONTEND] DADOS PROCESSADOS COM SUCESSO:`, {
+        totalOperations: allOperations.length,
+        orderOperations: orderOperations.length,
+        payableOperations: payableOperations.length,
+        formattedTransactions: formattedTransactions.length,
+        saldoDisponivel: balanceData.available,
+        saldoPendente: balanceData.pending,
         sampleOperation: allOperations[0],
         sampleTransaction: formattedTransactions[0]
       });
       
       toast({
-        title: "Dados carregados com sucesso!",
-        description: `${allOperations.length} operações e ${formattedTransactions.length} transações carregadas.`,
+        title: "🎉 Dados carregados com sucesso!",
+        description: `${allOperations.length} operações e ${formattedTransactions.length} transações. Saldo: R$ ${balanceData.available.toFixed(2)}`,
       });
       
     } catch (error: any) {

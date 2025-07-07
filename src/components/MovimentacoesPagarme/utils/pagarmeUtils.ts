@@ -68,8 +68,9 @@ export const groupPayablesByOrder = (payables: any[]): any[] => {
     if (payableGroup.length === 0) return;
     
     const firstPayable = payableGroup[0];
-    const totalAmount = payableGroup.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalFee = payableGroup.reduce((sum, p) => sum + (Number(p.fee) || 0), 0);
+    // CORREÇÃO: Converter valores de centavos para reais
+    const totalAmount = payableGroup.reduce((sum, p) => sum + ((Number(p.amount) || 0) / 100), 0);
+    const totalFee = payableGroup.reduce((sum, p) => sum + ((Number(p.fee) || 0) / 100), 0);
     
     consolidatedOperations.push({
       ...firstPayable,
@@ -85,7 +86,7 @@ export const groupPayablesByOrder = (payables: any[]): any[] => {
   return consolidatedOperations;
 };
 
-// Mapear orders para operações
+// Mapear orders para operações com CORREÇÃO DE VALORES
 export const mapOrdersToOperations = (ordersData: any[]): any[] => {
   return ordersData.map((order: any, index: number) => {
     const charge = order.charges?.[0] || {};
@@ -105,8 +106,9 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
       id: String(order.id || `order_${index}`),
       type: 'order',
       status: order.status || charge.status || 'unknown',
-      amount: Number(order.amount) || 0,
-      fee: Number(charge.fee) || Number(transaction.fee) || 0,
+      // CORREÇÃO: Valores vêm em centavos, converter para reais
+      amount: (Number(order.amount) || 0) / 100,
+      fee: (Number(charge.fee) || Number(transaction.fee) || 0) / 100,
       created_at: order.created_at || new Date().toISOString(),
       description: `Pedido ${order.code} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       // Dados do pagamento
@@ -134,7 +136,7 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
   }).filter(Boolean); // Remove valores null
 };
 
-// Mapear payables para operações com TODOS OS DADOS
+// Mapear payables para operações com CORREÇÃO DE VALORES
 export const mapPayablesToOperations = (payablesData: any[]): any[] => {
   return payablesData
     .filter((payable: any) => {
@@ -146,8 +148,9 @@ export const mapPayablesToOperations = (payablesData: any[]): any[] => {
       id: String(payable.id),
       type: 'payable',
       status: payable.status || 'unknown',
-      amount: Number(payable.amount) || 0,
-      fee: Number(payable.fee) || 0,
+      // CORREÇÃO: Valores vêm em centavos, converter para reais
+      amount: (Number(payable.amount) || 0) / 100,
+      fee: (Number(payable.fee) || 0) / 100,
       created_at: payable.created_at || new Date().toISOString(),
       description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       // Dados do pagamento
@@ -168,14 +171,14 @@ export const mapPayablesToOperations = (payablesData: any[]): any[] => {
       gateway_id: payable.gateway_id,
       recipient_id: payable.recipient_id,
       payment_date: payable.payment_date,
-      anticipation_fee: payable.anticipation_fee,
-      fraud_coverage_fee: payable.fraud_coverage_fee,
+      anticipation_fee: (Number(payable.anticipation_fee) || 0) / 100,
+      fraud_coverage_fee: (Number(payable.fraud_coverage_fee) || 0) / 100,
       // Código real extraído
       real_code: extractRealTransactionCode(payable)
     }));
 };
 
-// Mapear transações
+// Mapear transações com CORREÇÃO DE VALORES
 export const mapTransactions = (transactionsData: any[]): any[] => {
   return transactionsData
     .filter((transaction: any) => {
@@ -185,12 +188,13 @@ export const mapTransactions = (transactionsData: any[]): any[] => {
     })
     .map((transaction: any) => ({
       id: String(transaction.id),
-      amount: Number(transaction.amount) || 0,
+      // CORREÇÃO: Valores vêm em centavos, converter para reais
+      amount: (Number(transaction.amount) || 0) / 100,
       status: transaction.status || 'unknown',
       payment_method: transaction.payment_method || 'unknown',
       created_at: transaction.created_at || new Date().toISOString(),
       paid_at: transaction.paid_at,
-      fee: Number(transaction.fee) || 0, // Adicionado campo fee
+      fee: (Number(transaction.fee) || 0) / 100, // CORREÇÃO: Converter taxa também
       installments: Number(transaction.installments) || 1,
       acquirer_name: transaction.acquirer_name,
       acquirer_response_code: transaction.acquirer_response_code,

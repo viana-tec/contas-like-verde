@@ -65,10 +65,26 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
               {loading ? (
                 <RefreshCw size={16} className="animate-spin mr-2" />
               ) : null}
-              Atualizar Dados
+              {loading ? 'Coletando dados...' : 'Atualizar Dados'}
             </Button>
           )}
         </div>
+        
+        {/* Progress indicator durante loading */}
+        {loading && status === 'connected' && (
+          <div className="mt-4 p-4 bg-blue-900/20 border border-blue-600 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-400 text-sm font-medium">Coletando dados da API Pagar.me...</span>
+              <RefreshCw size={16} className="text-blue-400 animate-spin" />
+            </div>
+            <div className="text-blue-300 text-xs space-y-1">
+              <p>📊 Buscando payables, orders e transações</p>
+              <p>🔄 Processando paginação automática</p>
+              <p>💰 Calculando saldos e indicadores</p>
+              <p className="text-yellow-300">⏳ Este processo pode levar alguns minutos...</p>
+            </div>
+          </div>
+        )}
         
         {errorDetails && (
           <div className="mt-4 space-y-4">

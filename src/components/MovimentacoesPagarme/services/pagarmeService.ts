@@ -91,15 +91,16 @@ export const fetchAllDataUnlimited = async (
 ): Promise<any[]> => {
   let allData: any[] = [];
   let page = 1;
-  let pageSize = 250; // Otimizado para máxima eficiência
-  let maxPages = 500; // AUMENTADO para até 125.000 registros por endpoint
+  let pageSize = 100; // API v5 usa 'size' e max 100
+  let maxPages = 1000; // Permitir mais páginas para coleta completa
   let consecutiveEmptyPages = 0;
   const maxConsecutiveEmpty = 3;
   
-  console.log(`📄 [COLETA] Iniciando coleta MASSIVA OTIMIZADA: ${endpoint}`);
+  console.log(`📄 [COLETA] Iniciando coleta MASSIVA v5: ${endpoint}`);
   
   while (page <= maxPages && consecutiveEmptyPages < maxConsecutiveEmpty) {
-    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}count=${pageSize}&page=${page}`;
+    // API v5 usa 'size' e 'page' (não 'count')
+    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}size=${pageSize}&page=${page}`;
     
     onProgress?.(page, maxPages, `Coletando página ${page}...`);
     console.log(`📄 [COLETA] Página ${page}/${maxPages}: ${fullEndpoint}`);
@@ -166,12 +167,12 @@ export const fetchAllDataUnlimited = async (
   return allData;
 };
 
-// Função para buscar saldo com CORREÇÃO definitiva
+// Função para buscar saldo com CORREÇÃO definitiva - API v5
 export const fetchBalance = async (apiKey: string): Promise<{ available: number; pending: number }> => {
   try {
     console.log('💰 [SALDO] Buscando saldo...');
     
-    const recipientResponse = await makeApiRequest('/core/v5/recipients?count=1', apiKey);
+    const recipientResponse = await makeApiRequest('/core/v5/recipients?size=1', apiKey);
     
     if (!recipientResponse?.data?.[0]?.id) {
       console.warn('⚠️ [SALDO] Recipient não encontrado');
@@ -197,10 +198,10 @@ export const fetchBalance = async (apiKey: string): Promise<{ available: number;
   }
 };
 
-// Função para testar conexão
+// Função para testar conexão - API v5
 export const testConnection = async (apiKey: string): Promise<void> => {
   console.log('🔄 [TESTE] Testando conexão...');
-  const data = await makeApiRequest('/core/v5/payables?count=5', apiKey);
+  const data = await makeApiRequest('/core/v5/payables?size=5', apiKey);
   console.log('✅ [TESTE] Conexão OK:', data);
 };
 

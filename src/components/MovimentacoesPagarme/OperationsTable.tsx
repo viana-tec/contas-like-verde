@@ -114,8 +114,6 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                 <TableHead className="text-gray-300">Valor</TableHead>
                 <TableHead className="text-gray-300">Taxa</TableHead>
                 <TableHead className="text-gray-300">Parcelas</TableHead>
-                <TableHead className="text-gray-300">Bandeira</TableHead>
-                <TableHead className="text-gray-300">Adquirente</TableHead>
                 <TableHead className="text-gray-300">Data</TableHead>
               </TableRow>
             </TableHeader>
@@ -123,9 +121,9 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
               {currentOperations.map((operation, index) => (
                 <TableRow key={`${operation.id}_${index}`}>
                   <TableCell className="text-gray-300 font-mono text-xs">
-                    {typeof operation.id === 'string' && operation.id.length > 12 
-                      ? `${operation.id.substring(0, 12)}...`
-                      : String(operation.id)
+                    {String(operation.id).startsWith('ch_') || String(operation.id).startsWith('tran_') || String(operation.id).startsWith('op_')
+                      ? String(operation.id)
+                      : `${String(operation.id).substring(0, 15)}...`
                     }
                   </TableCell>
                   <TableCell className="text-green-400 font-mono font-bold">
@@ -173,12 +171,6 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                       </Badge>
                     )}
                     {(!operation.installments || operation.installments <= 1) && '-'}
-                  </TableCell>
-                  <TableCell className="text-gray-300 capitalize">
-                    {operation.card_brand || '-'}
-                  </TableCell>
-                  <TableCell className="text-gray-300 capitalize">
-                    {operation.acquirer_name || '-'}
                   </TableCell>
                   <TableCell className="text-gray-300">
                     {formatDate(operation.created_at)}

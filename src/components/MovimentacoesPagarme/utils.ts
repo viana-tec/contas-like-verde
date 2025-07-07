@@ -113,49 +113,55 @@ export const calculateFinancialIndicators = (
     sampleTransaction: transactions[0]
   });
   
-  const totalTransactions = transactions.length;
+  // CORREÇÃO: Usar operações PAGAS para receita (mais precisas que transações)
+  const paidOperations = operations.filter(op => 
+    op.status === 'paid' || op.status === 'available' || op.status === 'transferred'
+  );
+  console.log('💰 [INDICADORES] Operações pagas:', paidOperations.length);
   
-  // CORREÇÃO: Considerar apenas transações PAGAS para receita total
-  const paidTransactions = transactions.filter(tx => tx.status === 'paid');
-  console.log('💰 [INDICADORES] Transações pagas:', paidTransactions.length);
-  
-  const totalRevenue = paidTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const totalFees = paidTransactions.reduce((sum, tx) => sum + (tx.fee || 0), 0);
+  // Calcular receita baseada em operações (mais preciso)
+  const totalRevenue = paidOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
+  const totalFees = paidOperations.reduce((sum, op) => sum + (op.fee || 0), 0);
   const netRevenue = totalRevenue - totalFees;
+  
+  // Total de transações (incluindo todas, não apenas pagas)
+  const totalTransactions = Math.max(operations.length, transactions.length);
   
   console.log('💰 [INDICADORES] Receitas:', { totalRevenue, totalFees, netRevenue });
   
-  // CORREÇÃO: Considerar apenas transações PAGAS para cálculos por método
-  const pixTransactions = paidTransactions.filter(tx => tx.payment_method === 'pix');
-  const cardTransactions = paidTransactions.filter(tx => tx.payment_method === 'credit_card');
-  const debitTransactions = paidTransactions.filter(tx => tx.payment_method === 'debit_card');
-  const boletoTransactions = paidTransactions.filter(tx => tx.payment_method === 'boleto');
+  // CORREÇÃO: Usar operações pagas para cálculos por método (mais preciso)
+  const pixOperations = paidOperations.filter(op => op.payment_method === 'pix');
+  const cardOperations = paidOperations.filter(op => op.payment_method === 'credit_card');
+  const debitOperations = paidOperations.filter(op => op.payment_method === 'debit_card');
+  const boletoOperations = paidOperations.filter(op => op.payment_method === 'boleto');
   
-  const pixRevenue = pixTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const cardRevenue = cardTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const debitRevenue = debitTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-  const boletoRevenue = boletoTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const pixRevenue = pixOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
+  const cardRevenue = cardOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
+  const debitRevenue = debitOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
+  const boletoRevenue = boletoOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   
   const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
   
-  // Calcular taxa de aprovação
-  const approvedTransactions = transactions.filter(tx => tx.status === 'paid' || tx.status === 'processing');
-  const approvalRate = totalTransactions > 0 ? (approvedTransactions.length / totalTransactions) * 100 : 0;
+  // Calcular taxa de aprovação baseada em operações
+  const approvedOperations = operations.filter(op => 
+    op.status === 'paid' || op.status === 'processing' || op.status === 'available'
+  );
+  const approvalRate = operations.length > 0 ? (approvedOperations.length / operations.length) * 100 : 0;
   
   // Calcular taxa de estorno
-  const refundedTransactions = transactions.filter(tx => tx.status === 'refunded');
-  const refundRate = totalTransactions > 0 ? (refundedTransactions.length / totalTransactions) * 100 : 0;
+  const refundedOperations = operations.filter(op => op.status === 'refunded' || op.type === 'refund');
+  const refundRate = operations.length > 0 ? (refundedOperations.length / operations.length) * 100 : 0;
   
-  // Receita de hoje (apenas transações pagas)
+  // Receita de hoje (apenas operações pagas)
   const today = new Date();
-  const todayRevenue = paidTransactions
-    .filter(tx => isToday(tx.created_at))
-    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  const todayRevenue = paidOperations
+    .filter(op => isToday(op.created_at))
+    .reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   
-  // Receita do mês (apenas transações pagas)
-  const monthRevenue = paidTransactions
-    .filter(tx => isThisMonth(tx.created_at))
-    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  // Receita do mês (apenas operações pagas)
+  const monthRevenue = paidOperations
+    .filter(op => isThisMonth(op.created_at))
+    .reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   
   // Valores pendentes e disponíveis
   const pendingOperations = operations.filter(op => op.status === 'waiting_payment' || op.status === 'processing');

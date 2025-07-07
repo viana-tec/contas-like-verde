@@ -20,6 +20,11 @@ export interface BalanceOperation {
   soft_descriptor?: string;
   gateway_response_time?: number;
   antifraud_score?: number;
+  // Campos adicionais para códigos reais
+  real_code?: string;
+  reference_key?: string;
+  order_id?: string;
+  transaction_id?: string;
 }
 
 export interface Transaction {
@@ -68,6 +73,9 @@ export interface Transaction {
     qr_code_url?: string;
     expires_at?: string;
   };
+  // Campos adicionais para códigos reais
+  real_code?: string;
+  order_id?: string;
 }
 
 export interface FilterOptions {

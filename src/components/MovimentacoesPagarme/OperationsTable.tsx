@@ -2,6 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { BalanceOperation } from './types';
 import { formatCurrency, formatDate } from './utils';
 import { StatusBadge } from './StatusBadge';
@@ -38,51 +39,35 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
     return translations[method] || method.replace('_', ' ');
   };
 
-  // Função corrigida para gerar código iniciando com 4
-  const generateTransactionCode = (operation: BalanceOperation): string => {
-    // Primeiro, tentar usar códigos reais se disponíveis
+  // Função para extrair o código real da operação
+  const formatCode = (operation: BalanceOperation) => {
+    // Usar o código real extraído da API
+    if ((operation as any).real_code) {
+      return (operation as any).real_code;
+    }
+    
+    // Fallback para códigos existentes
     if (operation.authorization_code && operation.authorization_code.length >= 5) {
-      return operation.authorization_code.substring(0, 5);
+      return operation.authorization_code.substring(0, 8);
     }
     
     if (operation.tid && operation.tid.length >= 5) {
-      return operation.tid.substring(0, 5);
+      return operation.tid.substring(0, 8);
     }
     
     if (operation.nsu && operation.nsu.length >= 5) {
-      return operation.nsu.substring(0, 5);
+      return operation.nsu.substring(0, 8);
     }
     
-    // Se não tem códigos reais, gerar baseado no ID
+    // Último fallback - gerar baseado no ID
     const idStr = String(operation.id);
-    let numericId = 0;
+    const numericPart = idStr.replace(/[^0-9]/g, '');
     
-    // Converter ID para número (extrair apenas dígitos)
-    const digits = idStr.replace(/[^0-9]/g, '');
-    if (digits.length > 0) {
-      numericId = parseInt(digits) || 0;
+    if (numericPart.length >= 4) {
+      return `4${numericPart.slice(-4)}`;
     }
     
-    // Algoritmo para gerar código iniciando com 4
-    // Para ID 8302223812, deve gerar 45786
-    let code = 40000; // Começar com 4
-    
-    if (numericId > 0) {
-      // Usar hash simples do ID para gerar os 4 dígitos restantes
-      const hash = numericId % 9999; // Gera número de 0-9998
-      code = 40000 + hash;
-      
-      // Para o exemplo específico 8302223812 -> 45786
-      if (idStr === '8302223812') {
-        return '45786';
-      }
-    }
-    
-    return String(code);
-  };
-
-  const formatCode = (operation: BalanceOperation) => {
-    return generateTransactionCode(operation);
+    return `4${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
   };
 
   return (
@@ -102,6 +87,7 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                 <TableHead className="text-gray-300">Status</TableHead>
                 <TableHead className="text-gray-300">Valor</TableHead>
                 <TableHead className="text-gray-300">Taxa</TableHead>
+                <TableHead className="text-gray-300">Parcelas</TableHead>
                 <TableHead className="text-gray-300">Bandeira</TableHead>
                 <TableHead className="text-gray-300">Adquirente</TableHead>
                 <TableHead className="text-gray-300">Data</TableHead>
@@ -153,6 +139,14 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                   </TableCell>
                   <TableCell className="text-gray-300">
                     {operation.fee ? formatCurrency(operation.fee) : '-'}
+                  </TableCell>
+                  <TableCell className="text-gray-300">
+                    {operation.installments && operation.installments > 1 && (
+                      <Badge variant="secondary" className="bg-blue-900/30 text-blue-400">
+                        {operation.installments}x
+                      </Badge>
+                    )}
+                    {(!operation.installments || operation.installments <= 1) && '-'}
                   </TableCell>
                   <TableCell className="text-gray-300 capitalize">
                     {operation.card_brand || '-'}

@@ -97,9 +97,9 @@ serve(async (req) => {
     const fullUrl = `${baseUrl}${endpoint}`;
     console.log(`🌐 URL construída: ${fullUrl}`);
     
-    // Headers da requisição - API v5 usa Bearer token
+    // Headers da requisição - API v5 usa Basic Auth (não Bearer)
     const requestHeaders = {
-      'Authorization': `Bearer ${apiKey.trim()}`,
+      'Authorization': `Basic ${btoa(`${apiKey.trim()}:`)}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'Lovable-Integration/1.0',

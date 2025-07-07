@@ -295,8 +295,9 @@ export const MovimentacoesPagarme = () => {
       // Buscar saldo do recipient
       const balanceResponse = await makeApiRequest(`/core/v5/recipients/${recipientId}/balance`);
       
-      const available = (balanceResponse?.available?.amount || 0) / 100; // Converter de centavos
-      const pending = (balanceResponse?.waiting_funds?.amount || 0) / 100; // Converter de centavos
+      // CORREÇÃO: usar os campos corretos da resposta
+      const available = (balanceResponse?.available_amount || 0) / 100; // Converter de centavos
+      const pending = (balanceResponse?.waiting_funds_amount || 0) / 100; // Converter de centavos
       
       console.log(`💰 [FRONTEND] Saldo - Disponível: R$ ${available}, Pendente: R$ ${pending}`);
       
@@ -310,35 +311,35 @@ export const MovimentacoesPagarme = () => {
 
   // Função para extrair código real da transação/pedido
   const extractRealTransactionCode = (item: any): string => {
-    // Prioridade 1: reference_key do order (código real do pedido)
-    if (item.reference_key && item.reference_key.length >= 5) {
-      return item.reference_key.substring(0, 8);
+    // Prioridade 1: code do order (código real do pedido)
+    if (item.code && typeof item.code === 'string') {
+      return item.code;
     }
     
-    // Prioridade 2: authorization_code da transação
-    if (item.authorization_code && item.authorization_code.length >= 5) {
-      return item.authorization_code.substring(0, 8);
+    // Prioridade 2: reference_key do order
+    if (item.reference_key && item.reference_key.length >= 4) {
+      return item.reference_key;
     }
     
-    // Prioridade 3: gateway_id 
-    if (item.gateway_id && item.gateway_id.length >= 5) {
-      return item.gateway_id.substring(0, 8);
+    // Prioridade 3: authorization_code da transação
+    if (item.authorization_code && item.authorization_code.length >= 4) {
+      return item.authorization_code;
     }
     
-    // Prioridade 4: tid
-    if (item.tid && item.tid.length >= 5) {
-      return item.tid.substring(0, 8);
+    // Prioridade 4: gateway_id 
+    if (item.gateway_id && String(item.gateway_id).length >= 4) {
+      return String(item.gateway_id).substring(0, 8);
     }
     
     // Fallback: gerar baseado no ID seguindo o padrão solicitado
     const idStr = String(item.id || '');
     const numericPart = idStr.replace(/[^0-9]/g, '');
     
-    if (numericPart.length >= 10) {
-      // Para IDs como 8302269464 -> 45794, 8302214565 -> 45785
-      // Usar os últimos 4 dígitos e adicionar 4 no início
+    if (numericPart.length >= 8) {
+      // Usar transformação matemática para manter consistência
       const lastFour = numericPart.slice(-4);
-      return `4${lastFour.slice(0, 3)}${(parseInt(lastFour.slice(-1)) + 4) % 10}`;
+      const transformed = Math.floor(parseInt(lastFour) / 100) + 45000;
+      return String(transformed);
     }
     
     return `4${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
@@ -410,8 +411,8 @@ export const MovimentacoesPagarme = () => {
         // 1. Buscar TODOS os payables (sem limite)
         fetchAllDataUnlimited(`/core/v5/payables?created_since=${dateParam}`),
         
-        // 2. Buscar TODAS as transações (sem limite)  
-        fetchAllDataUnlimited(`/core/v5/transactions?created_since=${dateParam}`),
+        // 2. Buscar TODAS as transações (sem limite) - SEM created_since que causa erro 422
+        fetchAllDataUnlimited(`/core/v5/transactions`),
         
         // 3. Buscar TODOS os orders (sem limite)
         fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`),
@@ -432,45 +433,40 @@ export const MovimentacoesPagarme = () => {
       
       console.log(`📊 [FRONTEND] Payables consolidados: ${payablesData.length} → ${consolidatedPayables.length}`);
       
-      // Converter payables consolidados para operations
-      const operationsFromPayables = consolidatedPayables.map((payable: any, index: number) => {
-        const transaction = payable.transaction || {};
-        const card = transaction.card || {};
-        const order = ordersData.find(o => o.id === payable.split_rule?.rule_id) || {};
+      // Mapear orders para operações (usando o código correto)
+      const operationsFromOrders = ordersData.map((order: any, index: number) => {
+        const charge = order.charges?.[0] || {};
+        const customer = order.customer || {};
         
         return {
-          id: String(payable.id || `payable_${index}`),
-          type: payable.type || 'credit',
-          status: payable.status || 'unknown',
-          amount: Number(payable.amount) || 0,
-          fee: Number(payable.fee) || 0,
-          created_at: payable.created_at || new Date().toISOString(),
-          description: `${transaction.payment_method || order.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`,
-          // Dados expandidos do payable, transação e order
-          payment_method: payable.payment_method || transaction.payment_method || order.payment_method,
-          installments: payable.installments || transaction.installments || order.installments,
-          acquirer_name: payable.acquirer_name || transaction.acquirer_name,
-          acquirer_response_code: payable.acquirer_response_code || transaction.acquirer_response_code,
-          authorization_code: payable.authorization_code || transaction.authorization_code || order.authorization_code,
-          tid: payable.tid || transaction.tid,
-          nsu: payable.nsu || transaction.nsu,
-          card_brand: payable.card_brand || card.brand || transaction.card_brand,
-          card_last_four_digits: payable.card_last_four_digits || card.last_four_digits,
-          soft_descriptor: payable.soft_descriptor || transaction.soft_descriptor,
-          gateway_response_time: payable.gateway_response_time || transaction.gateway_response_time,
-          antifraud_score: payable.antifraud_score || transaction.antifraud_score,
+          id: String(order.id || `order_${index}`),
+          type: 'order',
+          status: order.status || 'unknown',
+          amount: Number(order.amount) || 0,
+          fee: 0, // Orders não têm fee direto
+          created_at: order.created_at || new Date().toISOString(),
+          description: `Pedido ${order.code} - ${charge.payment_method || 'Pagamento'}`,
+          // Dados do order
+          payment_method: charge.payment_method,
+          installments: 1,
+          acquirer_name: charge.acquirer_name,
+          acquirer_response_code: charge.acquirer_response_code,
+          authorization_code: charge.authorization_code,
+          tid: charge.tid,
+          nsu: charge.nsu,
+          card_brand: charge.card?.brand,
+          card_last_four_digits: charge.card?.last_four_digits,
+          soft_descriptor: charge.soft_descriptor,
+          gateway_response_time: charge.gateway_response_time,
+          antifraud_score: charge.antifraud_score,
           // Dados adicionais
-          transaction_id: transaction.id,
+          transaction_id: charge.id,
           order_id: order.id,
-          reference_key: order.reference_key || transaction.reference_key,
-          customer: transaction.customer || order.customer,
-          billing: transaction.billing || order.billing,
-          // Código real extraído
-          real_code: extractRealTransactionCode({
-            ...payable,
-            ...transaction,
-            ...order
-          })
+          reference_key: order.reference_key,
+          customer: customer,
+          billing: order.billing,
+          // Código real do pedido
+          real_code: order.code || extractRealTransactionCode(order)
         };
       });
       
@@ -502,23 +498,28 @@ export const MovimentacoesPagarme = () => {
         real_code: extractRealTransactionCode(transaction)
       }));
       
-      setOperations(operationsFromPayables);
+      // Combinar todas as operações
+      const allOperations = [...operationsFromOrders];
+      
+      setOperations(allOperations);
       setTransactions(formattedTransactions);
       setAvailableBalance(balanceData.available);
       setPendingBalance(balanceData.pending);
       
       console.log(`✅ [FRONTEND] Dados carregados com sucesso:`, {
-        operations: operationsFromPayables.length,
+        operations: allOperations.length,
         transactions: formattedTransactions.length,
+        payables: payablesData.length,
+        orders: ordersData.length,
         availableBalance: balanceData.available,
         pendingBalance: balanceData.pending,
-        sampleOperation: operationsFromPayables[0],
+        sampleOperation: allOperations[0],
         sampleTransaction: formattedTransactions[0]
       });
       
       toast({
         title: "Dados carregados com sucesso!",
-        description: `${operationsFromPayables.length} operações e ${formattedTransactions.length} transações dos últimos 30 dias.`,
+        description: `${allOperations.length} operações e ${formattedTransactions.length} transações carregadas.`,
       });
       
     } catch (error: any) {

@@ -134,6 +134,47 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
   }).filter(Boolean); // Remove valores null
 };
 
+// Mapear payables para operações com TODOS OS DADOS
+export const mapPayablesToOperations = (payablesData: any[]): any[] => {
+  return payablesData
+    .filter((payable: any) => {
+      // Filtrar apenas PIX e cartão de crédito
+      const paymentMethod = payable.payment_method;
+      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
+    })
+    .map((payable: any) => ({
+      id: String(payable.id),
+      type: 'payable',
+      status: payable.status || 'unknown',
+      amount: Number(payable.amount) || 0,
+      fee: Number(payable.fee) || 0,
+      created_at: payable.created_at || new Date().toISOString(),
+      description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
+      // Dados do pagamento
+      payment_method: payable.payment_method,
+      installments: Number(payable.installment) || 1,
+      acquirer_name: payable.acquirer_name,
+      acquirer_response_code: payable.acquirer_response_code,
+      authorization_code: payable.authorization_code,
+      tid: payable.tid,
+      nsu: payable.nsu,
+      card_brand: payable.card_brand,
+      card_last_four_digits: payable.card_last_four_digits,
+      soft_descriptor: payable.soft_descriptor,
+      gateway_response_time: payable.gateway_response_time,
+      antifraud_score: payable.antifraud_score,
+      // Dados adicionais dos payables
+      charge_id: payable.charge_id,
+      gateway_id: payable.gateway_id,
+      recipient_id: payable.recipient_id,
+      payment_date: payable.payment_date,
+      anticipation_fee: payable.anticipation_fee,
+      fraud_coverage_fee: payable.fraud_coverage_fee,
+      // Código real extraído
+      real_code: extractRealTransactionCode(payable)
+    }));
+};
+
 // Mapear transações
 export const mapTransactions = (transactionsData: any[]): any[] => {
   return transactionsData

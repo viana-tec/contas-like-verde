@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType, FilterOptions } from '../types';
 import { getMockOperations, getMockTransactions } from '../mockData';
 import { calculateFinancialIndicators, applyFilters } from '../utils';
-import { validateApiKey, mapOrdersToOperations, mapTransactions } from '../utils/pagarmeUtils';
+import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
 import { testConnection, fetchAllData } from '../services/pagarmeService';
 
 export const usePagarmeApi = () => {
@@ -174,10 +174,14 @@ export const usePagarmeApi = () => {
     setErrorDetails('');
     
     try {
-      const { ordersData, transactionsData, balanceData } = await fetchAllData(apiKey);
+      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey);
       
-      // Mapear orders para operações (usando o código correto) 
-      const allOperations = mapOrdersToOperations(ordersData);
+      // Mapear orders para operações E payables para operações também 
+      const orderOperations = mapOrdersToOperations(ordersData);
+      const payableOperations = mapPayablesToOperations(payablesData);
+      
+      // Combinar todas as operações
+      const allOperations = [...orderOperations, ...payableOperations];
       
       // Converter transações
       const formattedTransactions = mapTransactions(transactionsData);

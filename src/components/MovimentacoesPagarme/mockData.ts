@@ -9,7 +9,17 @@ export const getMockOperations = (): BalanceOperation[] => [
     amount: 15000,
     fee: 450,
     created_at: new Date().toISOString(),
-    description: 'Pagamento de cartão de crédito'
+    description: 'Pagamento de cartão de crédito',
+    payment_method: 'credit_card',
+    authorization_code: '45775',
+    tid: '45775001',
+    nsu: '12345',
+    card_brand: 'visa',
+    card_last_four_digits: '1234',
+    acquirer_name: 'cielo',
+    installments: 1,
+    gateway_response_time: 250,
+    antifraud_score: 85
   },
   {
     id: 'op_clm987654321',
@@ -36,7 +46,11 @@ export const getMockOperations = (): BalanceOperation[] => [
     amount: -2500,
     fee: 0,
     created_at: new Date(Date.now() - 259200000).toISOString(),
-    description: 'Estorno de pagamento'
+    description: 'Estorno de pagamento',
+    payment_method: 'credit_card',
+    authorization_code: '99887',
+    card_brand: 'mastercard',
+    acquirer_name: 'stone'
   },
   {
     id: 'op_clm111222333',
@@ -45,7 +59,67 @@ export const getMockOperations = (): BalanceOperation[] => [
     amount: 12000,
     fee: 360,
     created_at: new Date(Date.now() - 345600000).toISOString(),
-    description: 'Pagamento PIX pendente'
+    description: 'Pagamento PIX pendente',
+    payment_method: 'pix',
+    authorization_code: '77432',
+    gateway_response_time: 150
+  },
+  {
+    id: 'op_clm777888999',
+    type: 'payable',
+    status: 'paid',
+    amount: 8500,
+    fee: 255,
+    created_at: new Date(Date.now() - 432000000).toISOString(),
+    description: 'Pagamento boleto',
+    payment_method: 'boleto',
+    authorization_code: '33445'
+  },
+  {
+    id: 'op_clm999000111',
+    type: 'payable',
+    status: 'paid',
+    amount: 22000,
+    fee: 660,
+    created_at: new Date(Date.now() - 518400000).toISOString(),
+    description: 'Pagamento cartão débito',
+    payment_method: 'debit_card',
+    authorization_code: '66778',
+    tid: '66778002',
+    nsu: '67890',
+    card_brand: 'elo',
+    card_last_four_digits: '5678',
+    acquirer_name: 'rede',
+    gateway_response_time: 180,
+    antifraud_score: 92
+  },
+  {
+    id: 'op_clm222333444',
+    type: 'payable',
+    status: 'processing',
+    amount: 5500,
+    fee: 165,
+    created_at: new Date(Date.now() - 604800000).toISOString(),
+    description: 'Pagamento processando',
+    payment_method: 'credit_card',
+    authorization_code: '11223',
+    card_brand: 'amex',
+    acquirer_name: 'bin',
+    installments: 3
+  },
+  {
+    id: 'op_clm555777999',
+    type: 'payable',
+    status: 'refused',
+    amount: 0,
+    fee: 0,
+    created_at: new Date(Date.now() - 691200000).toISOString(),
+    description: 'Pagamento recusado',
+    payment_method: 'credit_card',
+    authorization_code: '00000',
+    card_brand: 'visa',
+    acquirer_name: 'cielo',
+    acquirer_response_code: '57'
   }
 ];
 

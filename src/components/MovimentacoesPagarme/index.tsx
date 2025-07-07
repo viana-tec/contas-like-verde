@@ -1,18 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType } from './types';
+import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType, FilterOptions } from './types';
 import { ApiConfiguration } from './ApiConfiguration';
 import { ConnectionStatus } from './ConnectionStatus';
-import { DataSummary } from './DataSummary';
+import { FinancialIndicators } from './FinancialIndicators';
+import { FilterPanel } from './FilterPanel';
 import { ChartsSection } from './ChartsSection';
 import { OperationsTable } from './OperationsTable';
 import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { getMockOperations, getMockTransactions } from './mockData';
+import { calculateFinancialIndicators, applyFilters } from './utils';
 
 export const MovimentacoesPagarme = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');
@@ -21,7 +23,40 @@ export const MovimentacoesPagarme = () => {
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('idle');
   const [errorDetails, setErrorDetails] = useState<string>('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    dateRange: { start: null, end: null },
+    paymentMethods: [],
+    statuses: [],
+    amountRange: { min: null, max: null },
+    searchTerm: '',
+    acquirer: '',
+    cardBrand: ''
+  });
   const { toast } = useToast();
+
+  // Aplicar filtros e calcular indicadores
+  const { operations: filteredOperations, transactions: filteredTransactions } = useMemo(() => 
+    applyFilters(operations, transactions, filters), 
+    [operations, transactions, filters]
+  );
+
+  const financialIndicators = useMemo(() => 
+    calculateFinancialIndicators(filteredOperations, filteredTransactions),
+    [filteredOperations, filteredTransactions]
+  );
+
+  const clearFilters = () => {
+    setFilters({
+      dateRange: { start: null, end: null },
+      paymentMethods: [],
+      statuses: [],
+      amountRange: { min: null, max: null },
+      searchTerm: '',
+      acquirer: '',
+      cardBrand: ''
+    });
+  };
 
   // Validação simples da chave API
   const validateApiKey = (key: string): boolean => {
@@ -293,10 +328,19 @@ export const MovimentacoesPagarme = () => {
 
       {(connectionStatus === 'connected' || hasData) && (
         <>
-          <DataSummary operations={operations} transactions={transactions} />
-          <ChartsSection operations={operations} />
-          <OperationsTable operations={operations} />
-          {transactions.length > 0 && <TransactionsTable transactions={transactions} />}
+          <FinancialIndicators indicators={financialIndicators} isLoading={loading} />
+          
+          <FilterPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClearFilters={clearFilters}
+            isExpanded={filtersExpanded}
+            onToggleExpanded={() => setFiltersExpanded(!filtersExpanded)}
+          />
+          
+          <ChartsSection operations={filteredOperations} />
+          <OperationsTable operations={filteredOperations} />
+          {filteredTransactions.length > 0 && <TransactionsTable transactions={filteredTransactions} />}
         </>
       )}
 

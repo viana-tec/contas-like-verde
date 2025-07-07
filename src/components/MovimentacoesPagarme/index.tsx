@@ -23,19 +23,20 @@ export const MovimentacoesPagarme = () => {
   const [errorDetails, setErrorDetails] = useState<string>('');
   const { toast } = useToast();
 
-  // Função para validar formato da chave API Pagar.me
+  // Validação simples da chave API
   const validateApiKey = (key: string): boolean => {
     if (!key || typeof key !== 'string') {
       return false;
     }
-    return key.trim().length >= 20;
+    const cleanKey = key.trim();
+    return cleanKey.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(cleanKey);
   };
 
   const saveApiKey = () => {
     if (!apiKey.trim()) {
       toast({
         title: "Erro",
-        description: "Por favor, insira uma chave API válida.",
+        description: "Por favor, insira uma chave API.",
         variant: "destructive",
       });
       return;
@@ -44,13 +45,13 @@ export const MovimentacoesPagarme = () => {
     if (!validateApiKey(apiKey)) {
       toast({
         title: "Formato inválido", 
-        description: "A chave da API deve ter pelo menos 20 caracteres.",
+        description: "A chave da API deve ter pelo menos 10 caracteres válidos.",
         variant: "destructive",
       });
       return;
     }
 
-    localStorage.setItem('pagarme_api_key', apiKey);
+    localStorage.setItem('pagarme_api_key', apiKey.trim());
     setConnectionStatus('idle');
     setErrorDetails('');
     
@@ -61,72 +62,59 @@ export const MovimentacoesPagarme = () => {
   };
 
   const makeApiRequest = async (endpoint: string) => {
-    if (!apiKey) {
+    if (!apiKey?.trim()) {
       throw new Error('Chave API não configurada');
     }
 
     if (!validateApiKey(apiKey)) {
-      throw new Error('Formato da chave API inválido. Deve ter pelo menos 20 caracteres');
+      throw new Error('Chave API inválida');
     }
 
-    console.log(`🚀 [FRONTEND] Fazendo requisição para: ${endpoint}`);
+    console.log(`🚀 [FRONTEND] Requisição para: ${endpoint}`);
     
     try {
       const requestBody = {
-        endpoint,
+        endpoint: endpoint.trim(),
         apiKey: apiKey.trim()
       };
       
-      console.log('📤 [FRONTEND] Enviando para Edge Function:', {
-        endpoint: endpoint,
-        apiKeyPrefix: apiKey.substring(0, 15) + '...'
-      });
+      console.log('📤 [FRONTEND] Enviando para Edge Function');
 
       const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
         body: requestBody
       });
 
-      console.log('📥 [FRONTEND] Resposta da Edge Function:', { 
+      console.log('📥 [FRONTEND] Resposta:', { 
         hasData: !!data, 
         hasError: !!error,
-        data: data,
-        error: error
+        dataKeys: data ? Object.keys(data) : [],
+        errorMsg: error?.message
       });
 
       if (error) {
-        console.error('❌ [FRONTEND] Erro na Edge Function:', error);
-        
-        // Tratar diferentes tipos de erro do Supabase
-        if (error.message?.includes('non-2xx status code')) {
-          throw new Error('Erro na comunicação com a API Pagar.me. Verifique sua chave API.');
-        }
-        
-        throw new Error(error.message || 'Erro na comunicação com a API');
+        console.error('❌ [FRONTEND] Erro Supabase:', error);
+        throw new Error(error.message || 'Erro na comunicação');
       }
 
       if (data?.error) {
-        console.error('❌ [FRONTEND] Erro da API Pagar.me:', data);
+        console.error('❌ [FRONTEND] Erro API:', data);
         throw new Error(data.details || data.error);
       }
 
-      console.log('✅ [FRONTEND] Sucesso! Dados recebidos:', {
-        dataType: typeof data,
-        hasDataArray: !!data?.data,
-        arrayLength: Array.isArray(data?.data) ? data.data.length : 'N/A'
-      });
+      console.log('✅ [FRONTEND] Sucesso!');
       return data;
       
     } catch (error: any) {
-      console.error('💥 [FRONTEND] Erro na requisição:', error);
-      throw new Error(error.message || 'Erro desconhecido');
+      console.error('💥 [FRONTEND] Erro:', error);
+      throw error;
     }
   };
 
   const testConnection = async () => {
-    if (!apiKey) {
+    if (!apiKey?.trim()) {
       toast({
         title: "Erro",
-        description: "Por favor, configure sua chave da API primeiro.",
+        description: "Configure sua chave da API primeiro.",
         variant: "destructive",
       });
       return;
@@ -135,7 +123,7 @@ export const MovimentacoesPagarme = () => {
     if (!validateApiKey(apiKey)) {
       toast({
         title: "Formato inválido",
-        description: "A chave da API deve ter pelo menos 20 caracteres.",
+        description: "Chave da API em formato inválido.",
         variant: "destructive",
       });
       return;
@@ -147,67 +135,64 @@ export const MovimentacoesPagarme = () => {
     try {
       console.log('🔄 [FRONTEND] Testando conexão...');
       
-      // Usar endpoint mais simples para teste
-      const data = await makeApiRequest('/core/v5/payables?count=1');
+      // Teste simples - buscar poucos payables
+      const data = await makeApiRequest('/core/v5/payables?count=5');
       
-      console.log('✅ [FRONTEND] Conexão estabelecida! Dados recebidos:', data);
+      console.log('✅ [FRONTEND] Conexão OK:', data);
       setConnectionStatus('connected');
       
       toast({
         title: "Conexão estabelecida",
-        description: "Conectado com sucesso à API Pagar.me!",
+        description: "API Pagar.me conectada com sucesso!",
       });
       
-      // Buscar dados automaticamente após conexão bem-sucedida
+      // Buscar dados após conectar
       await fetchData();
       
     } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro na conexão:', error);
+      console.error('❌ [FRONTEND] Erro conexão:', error);
       setConnectionStatus('error');
-      setErrorDetails(error.message);
+      setErrorDetails(error.message || 'Erro desconhecido');
       
       toast({
         title: "Erro de conexão",
-        description: error.message,
+        description: error.message || 'Não foi possível conectar',
         variant: "destructive",
       });
     }
   };
 
   const loadDemoData = () => {
-    console.log('📊 [FRONTEND] Carregando dados de demonstração...');
+    console.log('📊 [FRONTEND] Carregando demo...');
     
-    const mockOperations = getMockOperations();
-    const mockTransactions = getMockTransactions();
-
-    setOperations(mockOperations);
-    setTransactions(mockTransactions);
-    setConnectionStatus('connected');
-    setErrorDetails('');
-
-    toast({
-      title: "Dados de demonstração carregados",
-      description: `${mockOperations.length} operações e ${mockTransactions.length} transações de exemplo.`,
-    });
-  };
-
-  const fetchPayables = async () => {
     try {
-      console.log('💰 [FRONTEND] Buscando recebíveis...');
-      const data = await makeApiRequest('/core/v5/payables?count=25');
-      console.log('📊 [FRONTEND] Recebíveis retornados:', data);
-      return data.data || [];
+      const mockOperations = getMockOperations();
+      const mockTransactions = getMockTransactions();
+
+      setOperations(mockOperations);
+      setTransactions(mockTransactions);
+      setConnectionStatus('connected');
+      setErrorDetails('');
+
+      toast({
+        title: "Dados demo carregados",
+        description: `${mockOperations.length} operações e ${mockTransactions.length} transações.`,
+      });
     } catch (error) {
-      console.error('❌ [FRONTEND] Erro ao buscar recebíveis:', error);
-      throw error;
+      console.error('❌ Erro ao carregar demo:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados demo",
+        variant: "destructive",
+      });
     }
   };
 
   const fetchData = async () => {
-    if (!apiKey || !validateApiKey(apiKey)) {
+    if (!apiKey?.trim() || !validateApiKey(apiKey)) {
       toast({
         title: "Erro",
-        description: "Chave API inválida ou não configurada.",
+        description: "Chave API inválida.",
         variant: "destructive",
       });
       return;
@@ -217,24 +202,29 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 [FRONTEND] Buscando dados da Pagar.me...');
+      console.log('🔄 [FRONTEND] Buscando dados...');
       
-      // Buscar apenas payables por enquanto (transações requerem parâmetros específicos)
-      const payablesData = await fetchPayables();
+      // Buscar payables com limite baixo para teste
+      const payablesData = await makeApiRequest('/core/v5/payables?count=20');
       
-      console.log('📊 [FRONTEND] Dados processados:', {
-        payables: payablesData?.length || 0
+      if (!payablesData || !payablesData.data) {
+        throw new Error('Nenhum dado retornado da API');
+      }
+
+      console.log('📊 [FRONTEND] Dados recebidos:', {
+        total: payablesData.data?.length || 0,
+        firstItem: payablesData.data?.[0] || null
       });
       
-      // Converter payables para operations format
-      const operationsFromPayables = (payablesData || []).map((payable: any) => ({
-        id: payable.id,
+      // Converter payables para operations - CORRIGINDO O ERRO DO SUBSTRING
+      const operationsFromPayables = (payablesData.data || []).map((payable: any, index: number) => ({
+        id: String(payable.id || `payable_${index}`), // Garantir que é string
         type: payable.type || 'credit',
-        status: payable.status,
-        amount: payable.amount,
-        fee: payable.fee || 0,
-        created_at: payable.created_at,
-        description: `Recebível - ${payable.type || 'N/A'}`
+        status: payable.status || 'unknown',
+        amount: Number(payable.amount) || 0,
+        fee: Number(payable.fee) || 0,
+        created_at: payable.created_at || new Date().toISOString(),
+        description: `${payable.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`
       }));
       
       setOperations(operationsFromPayables);
@@ -242,17 +232,17 @@ export const MovimentacoesPagarme = () => {
       
       toast({
         title: "Dados carregados",
-        description: `${operationsFromPayables.length} recebíveis carregados.`,
+        description: `${operationsFromPayables.length} operações carregadas.`,
       });
       
     } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro ao buscar dados:', error);
-      setErrorDetails(error.message);
+      console.error('❌ [FRONTEND] Erro buscar dados:', error);
+      setErrorDetails(error.message || 'Erro ao buscar dados');
       setConnectionStatus('error');
       
       toast({
-        title: "Erro ao carregar dados",
-        description: error.message,
+        title: "Erro ao carregar",
+        description: error.message || 'Erro desconhecido',
         variant: "destructive",
       });
     } finally {
@@ -292,11 +282,8 @@ export const MovimentacoesPagarme = () => {
               <div>
                 <p className="font-medium">⚠️ Chave API não configurada</p>
                 <p className="text-sm mt-1">
-                  Configure sua chave da API Pagar.me para visualizar os dados reais, 
-                  ou clique em "Demo" para ver dados de exemplo.
-                </p>
-                <p className="text-xs mt-2 opacity-75">
-                  💡 A chave deve ter pelo menos 20 caracteres e estar ativa no dashboard da Pagar.me
+                  Configure sua chave da API Pagar.me para dados reais, 
+                  ou clique em "Demo" para dados de exemplo.
                 </p>
               </div>
             </div>

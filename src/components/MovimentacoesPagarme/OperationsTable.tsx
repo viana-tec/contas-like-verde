@@ -16,7 +16,7 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
   return (
     <Card className="bg-[#1a1a1a] border-gray-800">
       <CardHeader>
-        <CardTitle className="text-white">Operações de Saldo</CardTitle>
+        <CardTitle className="text-white">Operações de Saldo ({operations.length})</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -29,16 +29,25 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                 <TableHead className="text-gray-300">Valor</TableHead>
                 <TableHead className="text-gray-300">Taxa</TableHead>
                 <TableHead className="text-gray-300">Data</TableHead>
+                <TableHead className="text-gray-300">Descrição</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {operations.slice(0, 10).map((operation) => (
-                <TableRow key={operation.id}>
+              {operations.slice(0, 15).map((operation, index) => (
+                <TableRow key={`${operation.id}_${index}`}>
                   <TableCell className="text-gray-300 font-mono text-xs">
-                    {operation.id.substring(0, 12)}...
+                    {/* CORREÇÃO: Verificar se é string antes de usar substring */}
+                    {typeof operation.id === 'string' && operation.id.length > 12 
+                      ? `${operation.id.substring(0, 12)}...`
+                      : String(operation.id)
+                    }
                   </TableCell>
-                  <TableCell className="text-gray-300 capitalize">{operation.type.replace('_', ' ')}</TableCell>
-                  <TableCell><StatusBadge status={operation.status} /></TableCell>
+                  <TableCell className="text-gray-300 capitalize">
+                    {operation.type?.replace('_', ' ') || 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={operation.status} />
+                  </TableCell>
                   <TableCell className={`font-semibold ${
                     operation.amount >= 0 ? 'text-[#39FF14]' : 'text-red-400'
                   }`}>
@@ -50,10 +59,19 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                   <TableCell className="text-gray-300">
                     {formatDate(operation.created_at)}
                   </TableCell>
+                  <TableCell className="text-gray-300 text-sm">
+                    {operation.description || 'Sem descrição'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          
+          {operations.length > 15 && (
+            <div className="mt-4 text-center text-gray-400 text-sm">
+              Mostrando 15 de {operations.length} operações
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

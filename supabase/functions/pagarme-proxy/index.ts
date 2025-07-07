@@ -6,134 +6,113 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para validar chave API Pagar.me baseada na documentação oficial
+// Validação robusta da chave API Pagar.me
 function isValidPagarmeApiKey(apiKey: string): boolean {
   if (!apiKey || typeof apiKey !== 'string') {
     return false;
   }
   
-  // Pagar.me aceita diferentes formatos de chave
-  // Verificar se tem pelo menos 20 caracteres e não está vazia
-  return apiKey.length >= 20 && apiKey.trim() !== '';
+  // Remover espaços e verificar comprimento mínimo
+  const cleanKey = apiKey.trim();
+  if (cleanKey.length < 10) {
+    return false;
+  }
+  
+  // Verificar se contém apenas caracteres válidos (letras, números, underscore, hífen)
+  const validKeyPattern = /^[a-zA-Z0-9_-]+$/;
+  return validKeyPattern.test(cleanKey);
 }
 
 serve(async (req) => {
   const timestamp = new Date().toISOString();
-  console.log(`\n🚀 [${timestamp}] === NOVA REQUISIÇÃO EDGE FUNCTION ===`);
-  console.log(`📋 [${timestamp}] Método: ${req.method}`);
-  console.log(`🌐 [${timestamp}] URL: ${req.url}`);
+  console.log(`\n🚀 [${timestamp}] NOVA REQUISIÇÃO EDGE FUNCTION`);
+  console.log(`📋 Método: ${req.method}, URL: ${req.url}`);
   
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    console.log(`✅ [${timestamp}] Respondendo a requisição OPTIONS (CORS preflight)`);
+    console.log(`✅ Respondendo OPTIONS (CORS)`);
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verificar se há body na requisição
+    // Parse body
     let body;
     try {
       const text = await req.text();
-      console.log(`📝 [${timestamp}] Body bruto recebido:`, text);
+      console.log(`📝 Body recebido (${text.length} chars):`, text.substring(0, 200));
       
-      if (!text || text.trim() === '') {
-        console.error(`❌ [${timestamp}] Body da requisição está vazio`);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Body da requisição está vazio',
-            details: 'O corpo da requisição deve ser um JSON válido'
-          }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
+      if (!text?.trim()) {
+        throw new Error('Body vazio');
       }
       
       body = JSON.parse(text);
-      console.log(`✅ [${timestamp}] Body parseado com sucesso:`, body);
+      console.log(`✅ Body parseado:`, { 
+        hasEndpoint: !!body.endpoint, 
+        hasApiKey: !!body.apiKey,
+        keyLength: body.apiKey?.length || 0 
+      });
     } catch (parseError) {
-      console.error(`💥 [${timestamp}] Erro ao parsear JSON:`, parseError);
+      console.error(`💥 Erro no parse:`, parseError);
       return new Response(
         JSON.stringify({ 
-          error: 'Formato de dados inválido',
-          details: 'O corpo da requisição deve ser um JSON válido'
+          error: 'JSON inválido',
+          details: 'Corpo da requisição deve ser JSON válido'
         }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     const { endpoint, apiKey } = body;
     
-    console.log(`🎯 [${timestamp}] Endpoint solicitado:`, endpoint);
-    console.log(`🔑 [${timestamp}] API Key presente:`, !!apiKey);
-    console.log(`📏 [${timestamp}] API Key length:`, apiKey ? apiKey.length : 0);
-    
+    // Validações
     if (!endpoint) {
-      console.error(`❌ [${timestamp}] Endpoint não fornecido`);
+      console.error(`❌ Endpoint não fornecido`);
       return new Response(
-        JSON.stringify({ 
-          error: 'Endpoint obrigatório',
-          details: 'O parâmetro "endpoint" é obrigatório'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Endpoint obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!apiKey) {
-      console.error(`❌ [${timestamp}] API Key não fornecida`);
+      console.error(`❌ API Key não fornecida`);
       return new Response(
-        JSON.stringify({ 
-          error: 'Chave API obrigatória',
-          details: 'O parâmetro "apiKey" é obrigatório'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Chave API obrigatória' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validar formato da chave API
     if (!isValidPagarmeApiKey(apiKey)) {
-      console.error(`❌ [${timestamp}] Formato da chave API inválido`);
+      console.error(`❌ Chave API inválida`);
       return new Response(
         JSON.stringify({ 
-          error: 'Formato da chave API inválido',
-          details: 'A chave deve ter pelo menos 20 caracteres'
+          error: 'Chave API inválida',
+          details: 'Formato da chave não reconhecido'
         }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const fullUrl = `https://api.pagar.me${endpoint}`;
-    console.log(`🌐 [${timestamp}] URL completa construída:`, fullUrl);
+    // Construir URL
+    const baseUrl = 'https://api.pagar.me';
+    const fullUrl = `${baseUrl}${endpoint}`;
+    console.log(`🌐 URL construída: ${fullUrl}`);
     
-    // Usar Basic Auth conforme documentação da Pagar.me
-    const basicAuthCredentials = btoa(`${apiKey}:`);
-    console.log(`🔐 [${timestamp}] Basic Auth criado`);
-    
+    // Headers da requisição
     const requestHeaders = {
-      'Authorization': `Basic ${basicAuthCredentials}`,
+      'Authorization': `Basic ${btoa(`${apiKey.trim()}:`)}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'User-Agent': 'Lovable-Pagarme-Integration/2.0',
+      'User-Agent': 'Lovable-Integration/1.0',
     };
     
-    console.log(`📤 [${timestamp}] Fazendo requisição para:`, fullUrl);
+    console.log(`📤 Fazendo requisição...`);
 
-    // Fazer requisição com timeout
+    // Requisição com timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+    const timeoutId = setTimeout(() => {
+      console.log(`⏰ Timeout atingido`);
+      controller.abort();
+    }, 25000);
     
     try {
       const response = await fetch(fullUrl, {
@@ -144,63 +123,57 @@ serve(async (req) => {
 
       clearTimeout(timeoutId);
 
-      console.log(`📥 [${timestamp}] Resposta recebida - Status:`, response.status);
-      console.log(`📋 [${timestamp}] Response headers:`, Object.fromEntries(response.headers.entries()));
+      console.log(`📥 Resposta: ${response.status} ${response.statusText}`);
 
       const responseText = await response.text();
-      console.log(`📄 [${timestamp}] Response body:`, responseText.substring(0, 500));
+      console.log(`📄 Response (${responseText.length} chars):`, responseText.substring(0, 300));
       
       let data;
       try {
-        data = JSON.parse(responseText);
-        console.log(`✅ [${timestamp}] Response parseado com sucesso`);
+        data = responseText ? JSON.parse(responseText) : {};
       } catch (e) {
-        console.error(`⚠️ [${timestamp}] Erro ao parsear response JSON:`, e);
+        console.error(`⚠️ Erro parse JSON:`, e);
         return new Response(
           JSON.stringify({ 
             error: 'Resposta inválida da API',
-            details: 'A API retornou uma resposta que não é JSON válido',
-            raw_response: responseText
+            details: 'API não retornou JSON válido'
           }),
-          { 
-            status: 502, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       if (!response.ok) {
-        console.error(`❌ [${timestamp}] Erro na API Pagar.me:`, {
-          status: response.status,
-          statusText: response.statusText,
-          data: data
-        });
+        console.error(`❌ Erro HTTP ${response.status}:`, data);
 
-        let errorMessage = `Erro HTTP ${response.status}`;
-        let errorDetails = 'Erro desconhecido da API Pagar.me';
+        let errorMessage = `Erro ${response.status}`;
+        let errorDetails = 'Erro na API Pagar.me';
 
-        // Tratar erros específicos da Pagar.me
-        if (response.status === 401) {
-          errorMessage = 'Chave da API inválida ou expirada';
-          errorDetails = 'Verifique se sua chave API está correta e ativa no dashboard da Pagar.me';
-        } else if (response.status === 403) {
-          errorMessage = 'Acesso negado - Permissões insuficientes';
-          errorDetails = 'Sua chave API não tem permissão para acessar este recurso';
-        } else if (response.status === 404) {
-          errorMessage = 'Endpoint não encontrado';
-          errorDetails = 'O endpoint solicitado não existe na API Pagar.me';
-        } else if (response.status === 422) {
-          errorMessage = 'Parâmetros inválidos';
-          errorDetails = data?.message || 'Os parâmetros enviados são inválidos';
-          
-          // Log detalhado para erro 422
-          if (data?.errors) {
-            console.log(`🔍 [${timestamp}] Detalhes do erro 422:`, data.errors);
-            errorDetails += `. Detalhes: ${JSON.stringify(data.errors)}`;
-          }
-        } else if (response.status >= 500) {
-          errorMessage = 'Erro interno da API Pagar.me';
-          errorDetails = 'Erro no servidor da Pagar.me. Tente novamente em alguns minutos';
+        switch (response.status) {
+          case 401:
+            errorMessage = 'Chave API inválida';
+            errorDetails = 'Verifique sua chave no dashboard Pagar.me';
+            break;
+          case 403:
+            errorMessage = 'Acesso negado';
+            errorDetails = 'Chave sem permissões necessárias';
+            break;
+          case 404:
+            errorMessage = 'Endpoint não encontrado';
+            errorDetails = 'Verifique a URL da API';
+            break;
+          case 422:
+            errorMessage = 'Parâmetros inválidos';
+            errorDetails = data?.message || 'Verifique os parâmetros enviados';
+            break;
+          case 429:
+            errorMessage = 'Limite de requisições';
+            errorDetails = 'Aguarde antes de tentar novamente';
+            break;
+          default:
+            if (response.status >= 500) {
+              errorMessage = 'Erro interno da Pagar.me';
+              errorDetails = 'Tente novamente em alguns minutos';
+            }
         }
 
         return new Response(
@@ -208,70 +181,47 @@ serve(async (req) => {
             error: errorMessage,
             details: errorDetails,
             status: response.status,
-            debug: {
-              endpoint: endpoint,
-              fullUrl: fullUrl,
-              responseData: data,
-              timestamp: timestamp
-            }
+            timestamp: timestamp
           }),
-          { 
-            status: response.status, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`🎉 [${timestamp}] === SUCESSO === Dados recebidos da Pagar.me`);
+      console.log(`🎉 SUCESSO! Dados recebidos`);
       
       return new Response(
         JSON.stringify(data),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        console.error(`⏰ [${timestamp}] Timeout na requisição para Pagar.me`);
+        console.error(`⏰ Timeout na requisição`);
         return new Response(
           JSON.stringify({ 
-            error: 'Timeout na conexão',
-            details: 'A requisição para a API Pagar.me demorou mais que 30 segundos'
+            error: 'Timeout',
+            details: 'Requisição demorou mais que 25 segundos'
           }),
-          { 
-            status: 408, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
+      console.error(`💥 Erro na requisição:`, fetchError);
       throw fetchError;
     }
 
   } catch (error: any) {
-    console.error(`💥 [${timestamp}] === ERRO CRÍTICO ===`, error);
-    
-    let errorMessage = 'Erro interno do servidor';
-    let errorDetails = error.message;
-
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      errorMessage = 'Erro de conexão com a API Pagar.me';
-      errorDetails = 'Não foi possível conectar com a API. Verifique sua conexão de internet';
-    }
+    console.error(`💥 ERRO CRÍTICO:`, error);
     
     return new Response(
       JSON.stringify({ 
-        error: errorMessage,
-        details: errorDetails,
+        error: 'Erro interno',
+        details: error.message || 'Erro desconhecido',
         timestamp: timestamp
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 })

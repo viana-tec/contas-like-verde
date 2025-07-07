@@ -226,7 +226,7 @@ export const fetchAllData = async (
     
     const endpoints = [
       { name: 'payables', url: `/core/v5/payables?created_since=${dateParam}` },
-      { name: 'orders', url: `/core/v5/orders?created_since=${dateParam}` },
+      { name: 'orders', url: `/core/v5/orders?created_since=${dateParam}&status=paid,processing,waiting_payment` },
       { name: 'transactions', url: `/core/v5/transactions?created_since=${dateParam}` }
     ];
     

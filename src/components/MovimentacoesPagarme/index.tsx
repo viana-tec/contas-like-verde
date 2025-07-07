@@ -60,7 +60,7 @@ export const MovimentacoesPagarme = () => {
           <ApiConfiguration
             apiKey={apiKey}
             onApiKeyChange={setApiKey}
-            onSaveApiKey={saveApiKey}
+            onSaveApiKey={() => saveApiKey(apiKey)}
             onTestConnection={testConnection}
             onLoadDemo={loadDemoData}
             connectionStatus={connectionStatus}

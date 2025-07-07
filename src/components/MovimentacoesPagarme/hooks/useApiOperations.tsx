@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { pagarmeService } from '../services/pagarmeService';
+import { fetchAllData, testConnection as testApiConnection } from '../services/pagarmeService';
 import { dataCache } from '../services/dataCache';
 import { BalanceOperation, Transaction } from '../types';
 
@@ -26,9 +26,10 @@ export const useApiOperations = ({
   setErrorDetails
 }: UseApiOperationsProps) => {
   const [progressInfo, setProgressInfo] = useState<{
+    stage: string;
     current: number;
     total: number;
-    step: string;
+    info: string;
   } | null>(null);
 
   const saveApiKey = async (key: string) => {
@@ -48,14 +49,9 @@ export const useApiOperations = ({
     setErrorDetails(null);
 
     try {
-      const response = await pagarmeService.testConnection(apiKey);
-      if (response.success) {
-        setConnectionStatus('connected');
-        console.log('✅ Conexão testada com sucesso');
-      } else {
-        setConnectionStatus('error');
-        setErrorDetails(response.error || 'Erro desconhecido');
-      }
+      await testApiConnection(apiKey);
+      setConnectionStatus('connected');
+      console.log('✅ Conexão testada com sucesso');
     } catch (error) {
       setConnectionStatus('error');
       setErrorDetails(error instanceof Error ? error.message : 'Erro de conexão');
@@ -69,7 +65,7 @@ export const useApiOperations = ({
     setConnectionStatus('connecting');
     
     try {
-      const { mockOperations, mockTransactions } = await import('../mockData');
+      const { operations: mockOperations, transactions: mockTransactions } = await import('../mockData');
       
       setOperations(mockOperations);
       setTransactions(mockTransactions);
@@ -114,66 +110,30 @@ export const useApiOperations = ({
 
       console.log('🔄 Buscando dados da API Pagar.me...');
       
-      setProgressInfo({
-        current: 1,
-        total: 4,
-        step: 'Buscando operações de saldo...'
-      });
+      const onProgress = (stage: string, current: number, total: number, info: string) => {
+        setProgressInfo({ stage, current, total, info });
+      };
 
-      const operationsResponse = await pagarmeService.getBalanceOperations(apiKey);
-      
-      if (!operationsResponse.success) {
-        throw new Error(operationsResponse.error || 'Erro ao buscar operações');
-      }
+      const data = await fetchAllData(apiKey, onProgress, forceRefresh);
 
-      setProgressInfo({
-        current: 2,
-        total: 4,
-        step: 'Buscando transações...'
-      });
-
-      const transactionsResponse = await pagarmeService.getTransactions(apiKey);
-      
-      if (!transactionsResponse.success) {
-        throw new Error(transactionsResponse.error || 'Erro ao buscar transações');
-      }
-
-      setProgressInfo({
-        current: 3,
-        total: 4,
-        step: 'Buscando saldo...'
-      });
-
-      const balanceResponse = await pagarmeService.getBalance(apiKey);
-      
-      if (!balanceResponse.success) {
-        throw new Error(balanceResponse.error || 'Erro ao buscar saldo');
-      }
-
-      setProgressInfo({
-        current: 4,
-        total: 4,
-        step: 'Finalizando...'
-      });
-
-      const operations = operationsResponse.data || [];
-      const transactions = transactionsResponse.data || [];
-      const balance = balanceResponse.data;
+      const operations = data.payablesData || [];
+      const transactions = data.transactionsData || [];
+      const balance = data.balanceData;
 
       // Armazenar no cache
       const dataToCache = {
         operations,
         transactions,
-        availableBalance: balance?.available?.amount || 0,
-        pendingBalance: balance?.waiting_funds?.amount || 0
+        availableBalance: balance?.available || 0,
+        pendingBalance: balance?.pending || 0
       };
 
       dataCache.set(cacheKey, dataToCache, 30 * 60 * 1000); // 30 minutos
 
       setOperations(operations);
       setTransactions(transactions);
-      setAvailableBalance(balance?.available?.amount || 0);
-      setPendingBalance(balance?.waiting_funds?.amount || 0);
+      setAvailableBalance(balance?.available || 0);
+      setPendingBalance(balance?.pending || 0);
       setConnectionStatus('connected');
       
       console.log(`✅ Dados carregados: ${operations.length} operações, ${transactions.length} transações`);

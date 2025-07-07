@@ -1,9 +1,8 @@
-/**
- * Hook para gerenciar estado relacionado à API Pagar.me
- */
 
 import { useState } from 'react';
-import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType } from '../types';
+import { BalanceOperation, Transaction } from '../types';
+
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'idle';
 
 export const useApiState = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');
@@ -12,7 +11,7 @@ export const useApiState = () => {
   const [availableBalance, setAvailableBalance] = useState<number>(0);
   const [pendingBalance, setPendingBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('idle');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [errorDetails, setErrorDetails] = useState<string>('');
 
   const hasData = operations.length > 0 || transactions.length > 0;

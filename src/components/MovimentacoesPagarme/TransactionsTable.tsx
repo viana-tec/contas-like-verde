@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Transaction } from './types';
 import { formatCurrency, formatDate } from './utils';
 import { StatusBadge } from './StatusBadge';
@@ -16,13 +16,35 @@ interface TransactionsTableProps {
 
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // Aumentado de 10 para 50
 
-  if (transactions.length === 0) return null;
+  if (transactions.length === 0) {
+    return (
+      <Card className="bg-[#1a1a1a] border-gray-800">
+        <CardContent className="p-8 text-center">
+          <p className="text-gray-400">Nenhuma transação encontrada com os filtros aplicados</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalPages = Math.ceil(transactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentTransactions = transactions.slice(startIndex, endIndex);
 
   return (
     <Card className="bg-[#1a1a1a] border-gray-800">
       <CardHeader>
-        <CardTitle className="text-white">Transações Recentes</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-white">
+            Transações ({transactions.length} total)
+          </CardTitle>
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            Página {currentPage} de {totalPages} - Mostrando {currentTransactions.length} de {transactions.length}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -38,7 +60,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactio
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.slice(0, 10).map((transaction) => (
+              {currentTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell className="text-gray-300 font-mono text-xs">
                     {transaction.id.substring(0, 12)}...
@@ -120,6 +142,40 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactio
             </TableBody>
           </Table>
         </div>
+        
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-gray-400">
+              Mostrando {startIndex + 1} a {Math.min(endIndex, transactions.length)} de {transactions.length} transações
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-400">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

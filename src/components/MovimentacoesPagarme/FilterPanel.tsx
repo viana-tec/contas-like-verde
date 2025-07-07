@@ -321,14 +321,14 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="space-y-2">
               <Label className="text-gray-300">Adquirente</Label>
               <Select
-                value={filters.acquirer || ""}
-                onValueChange={(value) => onFiltersChange({ ...filters, acquirer: value })}
+                value={filters.acquirer || "all"}
+                onValueChange={(value) => onFiltersChange({ ...filters, acquirer: value === "all" ? "" : value })}
               >
                 <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
                   <SelectValue placeholder="Todos os adquirentes" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="">Todos os adquirentes</SelectItem>
+                  <SelectItem value="all">Todos os adquirentes</SelectItem>
                   {acquirerOptions.map((acquirer) => (
                     <SelectItem key={acquirer.value} value={acquirer.value}>
                       {acquirer.label}
@@ -341,14 +341,14 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="space-y-2">
               <Label className="text-gray-300">Bandeira do Cartão</Label>
               <Select
-                value={filters.cardBrand || ""}
-                onValueChange={(value) => onFiltersChange({ ...filters, cardBrand: value })}
+                value={filters.cardBrand || "all"}
+                onValueChange={(value) => onFiltersChange({ ...filters, cardBrand: value === "all" ? "" : value })}
               >
                 <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
                   <SelectValue placeholder="Todas as bandeiras" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="">Todas as bandeiras</SelectItem>
+                  <SelectItem value="all">Todas as bandeiras</SelectItem>
                   {cardBrandOptions.map((brand) => (
                     <SelectItem key={brand.value} value={brand.value}>
                       {brand.label}

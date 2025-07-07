@@ -1,8 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { BalanceOperation } from './types';
 import { formatCurrency, formatDate } from './utils';
 import { StatusBadge } from './StatusBadge';
@@ -12,7 +14,23 @@ interface OperationsTableProps {
 }
 
 export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) => {
-  if (operations.length === 0) return null;
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // Aumentado de 10 para 50
+
+  if (operations.length === 0) {
+    return (
+      <Card className="bg-[#1a1a1a] border-gray-800">
+        <CardContent className="p-8 text-center">
+          <p className="text-gray-400">Nenhuma operação encontrada com os filtros aplicados</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalPages = Math.ceil(operations.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentOperations = operations.slice(startIndex, endIndex);
 
   const translateType = (type: string) => {
     const translations: Record<string, string> = {
@@ -39,14 +57,11 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
     return translations[method] || method.replace('_', ' ');
   };
 
-  // Função para extrair o código real da operação
   const formatCode = (operation: BalanceOperation) => {
-    // Usar o código real extraído da API
     if ((operation as any).real_code) {
       return (operation as any).real_code;
     }
     
-    // Fallback para códigos existentes
     if (operation.authorization_code && operation.authorization_code.length >= 5) {
       return operation.authorization_code.substring(0, 8);
     }
@@ -59,7 +74,6 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
       return operation.nsu.substring(0, 8);
     }
     
-    // Último fallback - gerar baseado no ID
     const idStr = String(operation.id);
     const numericPart = idStr.replace(/[^0-9]/g, '');
     
@@ -73,7 +87,14 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
   return (
     <Card className="bg-[#1a1a1a] border-gray-800">
       <CardHeader>
-        <CardTitle className="text-white">Operações de Saldo ({operations.length})</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-white">
+            Operações de Saldo ({operations.length} total)
+          </CardTitle>
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            Página {currentPage} de {totalPages} - Mostrando {currentOperations.length} de {operations.length}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -94,7 +115,7 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {operations.map((operation, index) => (
+              {currentOperations.map((operation, index) => (
                 <TableRow key={`${operation.id}_${index}`}>
                   <TableCell className="text-gray-300 font-mono text-xs">
                     {typeof operation.id === 'string' && operation.id.length > 12 
@@ -162,6 +183,40 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
             </TableBody>
           </Table>
         </div>
+        
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-gray-400">
+              Mostrando {startIndex + 1} a {Math.min(endIndex, operations.length)} de {operations.length} operações
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-400">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

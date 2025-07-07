@@ -50,6 +50,7 @@ export const usePagarmeApi = () => {
     testConnection: apiOperations.testConnection,
     loadDemoData: apiOperations.loadDemoData,
     fetchData: apiOperations.fetchData,
+    loadSavedData: apiOperations.loadSavedData,
     
     // Ações dos filtros
     setFiltersExpanded: filtersState.setFiltersExpanded,

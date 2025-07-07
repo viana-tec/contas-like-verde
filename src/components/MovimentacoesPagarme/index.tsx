@@ -39,8 +39,16 @@ export const MovimentacoesPagarme = () => {
     saveApiKey,
     testConnection,
     loadDemoData,
-    fetchData
+    fetchData,
+    loadSavedData
   } = usePagarmeApi();
+
+  // Carregar dados salvos na inicialização
+  React.useEffect(() => {
+    if (!apiKey && !hasData) {
+      loadSavedData();
+    }
+  }, []);
 
   return (
     <div className="space-y-6">

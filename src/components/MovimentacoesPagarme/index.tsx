@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Clock } from 'lucide-react';
 import { ApiConfiguration } from './ApiConfiguration';
 import { ConnectionStatus } from './ConnectionStatus';
 import { FinancialIndicators } from './FinancialIndicators';
@@ -30,6 +30,7 @@ export const MovimentacoesPagarme = () => {
     financialIndicators,
     hasData,
     progressInfo,
+    autoRefresh,
     
     // Ações
     setApiKey,
@@ -47,21 +48,31 @@ export const MovimentacoesPagarme = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-white">Movimentações Pagar.me</h1>
         
-        <ApiConfiguration
-          apiKey={apiKey}
-          onApiKeyChange={setApiKey}
-          onSaveApiKey={saveApiKey}
-          onTestConnection={testConnection}
-          onLoadDemo={loadDemoData}
-          connectionStatus={connectionStatus}
-        />
+        <div className="flex items-center gap-4">
+          {/* Status da atualização automática */}
+          {apiKey && hasData && (
+            <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded-lg">
+              <Clock size={16} className="text-green-400" />
+              <span>Atualização automática: 1h</span>
+            </div>
+          )}
+          
+          <ApiConfiguration
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            onSaveApiKey={saveApiKey}
+            onTestConnection={testConnection}
+            onLoadDemo={loadDemoData}
+            connectionStatus={connectionStatus}
+          />
+        </div>
       </div>
 
       <ConnectionStatus
         status={connectionStatus}
         errorDetails={errorDetails}
         loading={loading}
-        onRefresh={fetchData}
+        onRefresh={() => fetchData(true)}
         progressInfo={progressInfo}
       />
 

@@ -15,7 +15,7 @@ interface OperationsTableProps {
 
 export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50; // Aumentado de 10 para 50
+  const itemsPerPage = 50;
 
   if (operations.length === 0) {
     return (
@@ -35,6 +35,7 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
   const translateType = (type: string) => {
     const translations: Record<string, string> = {
       'payable': 'Recebível',
+      'order': 'Pedido',
       'transfer': 'Transferência',
       'fee_collection': 'Cobrança de Taxa',
       'refund': 'Estorno',
@@ -57,31 +58,29 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
     return translations[method] || method.replace('_', ' ');
   };
 
-  const formatCode = (operation: BalanceOperation) => {
+  const getCustomerName = (operation: BalanceOperation) => {
+    const customer = (operation as any).customer;
+    if (customer) {
+      return customer.name || customer.email || '-';
+    }
+    return '-';
+  };
+
+  const getOrderCode = (operation: BalanceOperation) => {
+    // Para pedidos, usar o código do pedido
     if ((operation as any).real_code) {
       return (operation as any).real_code;
     }
     
-    if (operation.authorization_code && operation.authorization_code.length >= 5) {
-      return operation.authorization_code.substring(0, 8);
+    // Para operações de payables, tentar extrair do charge_id ou transaction_id
+    if ((operation as any).charge_id) {
+      const chargeId = (operation as any).charge_id;
+      // Extrair número do charge_id (ex: ch_abc123 -> 123)
+      const match = chargeId.match(/\d+/);
+      return match ? match[0] : chargeId;
     }
     
-    if (operation.tid && operation.tid.length >= 5) {
-      return operation.tid.substring(0, 8);
-    }
-    
-    if (operation.nsu && operation.nsu.length >= 5) {
-      return operation.nsu.substring(0, 8);
-    }
-    
-    const idStr = String(operation.id);
-    const numericPart = idStr.replace(/[^0-9]/g, '');
-    
-    if (numericPart.length >= 4) {
-      return `4${numericPart.slice(-4)}`;
-    }
-    
-    return `4${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+    return '-';
   };
 
   return (
@@ -102,7 +101,8 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
             <TableHeader>
               <TableRow>
                 <TableHead className="text-gray-300">ID Transação</TableHead>
-                <TableHead className="text-gray-300">Código</TableHead>
+                <TableHead className="text-gray-300">Cliente</TableHead>
+                <TableHead className="text-gray-300">Código Pedido</TableHead>
                 <TableHead className="text-gray-300">Tipo</TableHead>
                 <TableHead className="text-gray-300">Método</TableHead>
                 <TableHead className="text-gray-300">Status</TableHead>
@@ -123,8 +123,11 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
                       : String(operation.id)
                     }
                   </TableCell>
+                  <TableCell className="text-gray-300 max-w-[150px] truncate">
+                    {getCustomerName(operation)}
+                  </TableCell>
                   <TableCell className="text-green-400 font-mono font-bold">
-                    {formatCode(operation)}
+                    {getOrderCode(operation)}
                   </TableCell>
                   <TableCell className="text-gray-300">
                     {translateType(operation.type)}
@@ -184,7 +187,6 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
           </Table>
         </div>
         
-        {/* Paginação */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-gray-400">

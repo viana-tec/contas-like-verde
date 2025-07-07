@@ -1,12 +1,13 @@
 
 /**
  * Hook principal que compõe todos os hooks menores para gerenciar a API Pagar.me
- * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
+ * VERSÃO OTIMIZADA COM CACHE E ATUALIZAÇÃO AUTOMÁTICA
  */
 
 import { useApiState } from './useApiState';
 import { useFilters } from './useFilters';
 import { useApiOperations } from './useApiOperations';
+import { useAutoRefresh } from './useAutoRefresh';
 
 export const usePagarmeApi = () => {
   // Estado da API
@@ -25,6 +26,18 @@ export const usePagarmeApi = () => {
     setLoading: apiState.setLoading,
     setConnectionStatus: apiState.setConnectionStatus,
     setErrorDetails: apiState.setErrorDetails
+  });
+
+  // Atualização automática a cada hora (apenas se tiver API key e dados)
+  const autoRefresh = useAutoRefresh({
+    onRefresh: () => {
+      if (apiState.apiKey && apiState.hasData) {
+        console.log('🔄 Executando atualização automática dos dados...');
+        apiOperations.fetchData(true); // forceRefresh = true
+      }
+    },
+    intervalMs: 60 * 60 * 1000, // 1 hora
+    enabled: Boolean(apiState.apiKey && apiState.hasData)
   });
 
   return {
@@ -57,6 +70,9 @@ export const usePagarmeApi = () => {
     clearFilters: filtersState.clearFilters,
     
     // Progresso detalhado
-    progressInfo: apiOperations.progressInfo
+    progressInfo: apiOperations.progressInfo,
+    
+    // Controle de atualização automática
+    autoRefresh
   };
 };

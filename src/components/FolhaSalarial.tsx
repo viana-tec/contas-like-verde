@@ -1,72 +1,33 @@
 
 import React, { useState } from 'react';
-import { Download, FileSpreadsheet, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useFolhaSalarialData } from './FolhaSalarial/hooks/useFolhaSalarialData';
-import { useCLTEmployees } from './FolhaSalarial/hooks/useCLTEmployees';
-import { useServiceProviders } from './FolhaSalarial/hooks/useServiceProviders';
 import { CLTEmployeesTab } from './FolhaSalarial/components/CLTEmployeesTab';
 import { ServiceProvidersTab } from './FolhaSalarial/components/ServiceProvidersTab';
 import { FolhaSalarialModal } from './FolhaSalarial/components/FolhaSalarialModal';
-import { CLTEmployee, ServiceProvider } from './FolhaSalarial/types';
+import { useFolhaSalarialData } from './FolhaSalarial/hooks/useFolhaSalarialData';
 
-export const FolhaSalarial: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'clt' | 'provider'>('clt');
-  const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast();
-
-  const { cltEmployees, serviceProviders, loading, refetchData } = useFolhaSalarialData();
-  
+export const FolhaSalarial = () => {
   const {
+    employees,
+    providers,
     editingEmployee,
-    setEditingEmployee,
+    editingProvider,
     cltFormData,
     setCltFormData,
-    handleSaveCLT,
-    handleDeleteCLT
-  } = useCLTEmployees(refetchData);
-
-  const {
-    editingProvider,
-    setEditingProvider,
     providerFormData,
     setProviderFormData,
-    handleSaveProvider,
-    handleDeleteProvider
-  } = useServiceProviders(refetchData);
+    saveCLTEmployee,
+    saveServiceProvider,
+    deleteCLTEmployee,
+    deleteServiceProvider,
+    resetForms,
+    setEditingEmployee,
+    setEditingProvider
+  } = useFolhaSalarialData();
 
-  const handleOpenModal = (type: 'clt' | 'provider', item?: CLTEmployee | ServiceProvider) => {
-    setActiveTab(type);
-    if (type === 'clt') {
-      if (item) {
-        setEditingEmployee(item as CLTEmployee);
-        setCltFormData(item as CLTEmployee);
-      } else {
-        setEditingEmployee(null);
-        setCltFormData({ payment_day_1: 15, payment_day_2: 30, salary_advance: 0 });
-      }
-    } else {
-      if (item) {
-        setEditingProvider(item as ServiceProvider);
-        setProviderFormData(item as ServiceProvider);
-      } else {
-        setEditingProvider(null);
-        setProviderFormData({ payment_day_1: 15, payment_day_2: 30 });
-      }
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleCopyPix = (pixKey: string) => {
-    navigator.clipboard.writeText(pixKey);
-    toast({
-      title: "Copiado!",
-      description: "Chave PIX copiada para a área de transferência",
-    });
-  };
+  const [activeTab, setActiveTab] = useState<'clt' | 'provider'>('clt');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -75,61 +36,108 @@ export const FolhaSalarial: React.FC = () => {
     }).format(value);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#39FF14] mx-auto"></div>
-          <p className="mt-2 text-gray-400">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleCopyPix = async (pixKey: string) => {
+    try {
+      await navigator.clipboard.writeText(pixKey);
+      // You could add a toast notification here
+      console.log('PIX copiado para a área de transferência');
+    } catch (err) {
+      console.error('Erro ao copiar PIX:', err);
+    }
+  };
+
+  const handleOpenModal = (employee?: any, provider?: any) => {
+    if (employee) {
+      setEditingEmployee(employee);
+      setCltFormData(employee);
+      setActiveTab('clt');
+    } else if (provider) {
+      setEditingProvider(provider);
+      setProviderFormData(provider);
+      setActiveTab('provider');
+    } else {
+      resetForms();
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    resetForms();
+  };
+
+  const handleSaveCLT = async (): Promise<boolean> => {
+    try {
+      await saveCLTEmployee();
+      return true;
+    } catch (error) {
+      console.error('Erro ao salvar funcionário CLT:', error);
+      return false;
+    }
+  };
+
+  const handleSaveProvider = async (): Promise<boolean> => {
+    try {
+      await saveServiceProvider();
+      return true;
+    } catch (error) {
+      console.error('Erro ao salvar prestador:', error);
+      return false;
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <Users className="h-8 w-8 text-[#39FF14]" />
-          <h1 className="text-3xl font-bold">Folha Salarial</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-green-50/20 to-gray-100 p-6">
+      {/* Header com Logo */}
+      <div className="mb-8 text-center">
+        <div className="inline-flex items-center justify-center p-6 bg-gradient-to-r from-green-400/10 to-green-600/10 rounded-2xl backdrop-blur-sm border border-green-200/20">
+          <img 
+            src="/lovable-uploads/f99b75e4-8df3-4c05-81a5-e91f03700671.png" 
+            alt="Finance Logo" 
+            className="h-16 w-auto"
+          />
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            PDF
-          </Button>
-          <Button variant="outline">
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Excel
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold mt-4 bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">
+          Folha Salarial
+        </h1>
+        <p className="text-gray-600 mt-2">Gestão de Funcionários e Prestadores de Serviço</p>
       </div>
 
-      <Tabs defaultValue="clt" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="clt">Funcionários CLT</TabsTrigger>
-          <TabsTrigger value="providers">Prestadores de Serviço</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'clt' | 'provider')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-green-100/50 to-green-200/50 border border-green-300/30">
+          <TabsTrigger 
+            value="clt" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white font-semibold"
+          >
+            Funcionários CLT
+          </TabsTrigger>
+          <TabsTrigger 
+            value="provider"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white font-semibold"
+          >
+            Prestadores de Serviço
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="clt">
+        
+        <TabsContent value="clt" className="mt-6">
           <CLTEmployeesTab
-            employees={cltEmployees}
+            employees={employees}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
-            onOpenModal={(employee) => handleOpenModal('clt', employee)}
-            onDeleteEmployee={handleDeleteCLT}
+            onOpenModal={(employee) => handleOpenModal(employee)}
+            onDeleteEmployee={deleteCLTEmployee}
             onCopyPix={handleCopyPix}
             formatCurrency={formatCurrency}
           />
         </TabsContent>
-
-        <TabsContent value="providers">
+        
+        <TabsContent value="provider" className="mt-6">
           <ServiceProvidersTab
-            providers={serviceProviders}
+            providers={providers}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
-            onOpenModal={(provider) => handleOpenModal('provider', provider)}
-            onDeleteProvider={handleDeleteProvider}
+            onOpenModal={(provider) => handleOpenModal(undefined, provider)}
+            onDeleteProvider={deleteServiceProvider}
             onCopyPix={handleCopyPix}
             formatCurrency={formatCurrency}
           />
@@ -138,7 +146,7 @@ export const FolhaSalarial: React.FC = () => {
 
       <FolhaSalarialModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         activeTab={activeTab}
         editingEmployee={editingEmployee}
         editingProvider={editingProvider}

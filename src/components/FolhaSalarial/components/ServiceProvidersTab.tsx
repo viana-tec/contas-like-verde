@@ -39,15 +39,15 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
             placeholder="Buscar prestador..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
+            className="w-64 bg-gradient-to-r from-white to-green-50/30 border-green-200/50 focus:border-green-400"
           />
-          <Card className="p-3 bg-gray-900 border-gray-800">
+          <Card className="p-3 bg-gradient-to-br from-gray-900 via-green-900/20 to-gray-900 border-green-700/30 shadow-lg">
             <div className="text-center">
               <div className="text-lg font-bold text-[#39FF14]">{providers.length}</div>
               <div className="text-xs text-gray-400">Prestadores</div>
             </div>
           </Card>
-          <Card className="p-3 bg-gray-900 border-gray-800">
+          <Card className="p-3 bg-gradient-to-br from-gray-900 via-green-900/20 to-gray-900 border-green-700/30 shadow-lg">
             <div className="text-center">
               <div className="text-lg font-bold text-[#39FF14]">
                 {formatCurrency(providers.reduce((sum, p) => sum + p.monthly_amount, 0))}
@@ -58,17 +58,17 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
         </div>
         <Button 
           onClick={() => onOpenModal()}
-          className="bg-[#39FF14] text-black hover:bg-[#39FF14]/90"
+          className="bg-gradient-to-r from-[#39FF14] to-green-400 text-black hover:from-[#39FF14]/90 hover:to-green-400/90 shadow-lg hover:shadow-xl transition-all duration-300"
         >
           <Plus className="h-4 w-4 mr-2" />
           Novo Prestador
         </Button>
       </div>
 
-      <Card className="bg-gray-900 border-gray-800">
+      <Card className="bg-gradient-to-br from-gray-900 via-green-900/10 to-gray-900 border-green-800/30 shadow-xl backdrop-blur-sm">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-green-800/50">
               <TableHead className="text-white font-bold">Nome</TableHead>
               <TableHead className="text-white font-bold">Tipo de Serviço</TableHead>
               <TableHead className="text-white font-bold">Valor Mensal</TableHead>
@@ -80,10 +80,10 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
           </TableHeader>
           <TableBody>
             {filteredProviders.map((provider) => (
-              <TableRow key={provider.id}>
+              <TableRow key={provider.id} className="border-green-800/30 hover:bg-gradient-to-r hover:from-green-900/20 hover:to-transparent transition-all duration-300">
                 <TableCell className="font-medium text-white font-bold">{provider.name}</TableCell>
                 <TableCell className="text-white font-bold">{provider.service_type}</TableCell>
-                <TableCell className="text-[#39FF14] font-bold">
+                <TableCell className="text-[#39FF14] font-bold bg-gradient-to-r from-transparent to-green-900/20 rounded">
                   {formatCurrency(provider.monthly_amount)}
                 </TableCell>
                 <TableCell className="text-white font-bold">Dia {provider.payment_day_1}</TableCell>
@@ -96,7 +96,7 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
                         size="sm" 
                         variant="ghost"
                         onClick={() => onCopyPix(provider.pix_key!)}
-                        className="p-1 h-auto"
+                        className="p-1 h-auto hover:bg-green-800/30"
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
@@ -109,6 +109,7 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
                       size="sm" 
                       variant="ghost"
                       onClick={() => onOpenModal(provider)}
+                      className="hover:bg-green-800/30"
                     >
                       <Edit3 className="h-4 w-4" />
                     </Button>
@@ -116,6 +117,7 @@ export const ServiceProvidersTab: React.FC<ServiceProvidersTabProps> = ({
                       size="sm" 
                       variant="ghost"
                       onClick={() => onDeleteProvider(provider.id)}
+                      className="hover:bg-red-800/30"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

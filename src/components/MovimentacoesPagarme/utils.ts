@@ -4,8 +4,10 @@
 
 import { BalanceOperation, Transaction, FilterOptions, FinancialIndicators } from './types';
 
-// Função para formatar moeda
+// Função para formatar moeda (CORREÇÃO: remover divisão desnecessária por 100)
 export const formatCurrency = (value: number): string => {
+  // Os valores já vêm convertidos corretamente dos utils (de centavos para reais)
+  // Não dividir novamente por 100 aqui!
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -99,42 +101,31 @@ export const getMonthlyBalance = (operations: BalanceOperation[]): Array<{
   return Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month));
 };
 
-// Função para calcular indicadores financeiros CORRIGIDA
+// Função para calcular indicadores financeiros
 export const calculateFinancialIndicators = (
   operations: BalanceOperation[], 
   transactions: Transaction[]
 ): FinancialIndicators => {
-  console.log('🔄 Calculando indicadores financeiros...');
-  console.log('📊 Total operations:', operations.length);
-  console.log('📊 Total transactions:', transactions.length);
-  
-  // CORREÇÃO: Filtrar apenas transações PAGAS para receita
-  const paidTransactions = transactions.filter(tx => {
-    const isPaid = tx.status === 'paid';
-    if (isPaid) {
-      console.log('✅ Transação paga encontrada:', {
-        id: tx.id,
-        amount: tx.amount,
-        status: tx.status,
-        payment_method: tx.payment_method
-      });
-    }
-    return isPaid;
+  console.log('🔍 [INDICADORES] Calculando:', {
+    totalOperations: operations.length,
+    totalTransactions: transactions.length,
+    sampleOperation: operations[0],
+    sampleTransaction: transactions[0]
   });
-
-  console.log('💰 Transações pagas:', paidTransactions.length);
-
-  const totalTransactions = paidTransactions.length;
-  const totalRevenue = paidTransactions.reduce((sum, tx) => {
-    const amount = tx.amount || 0;
-    console.log('💵 Somando receita:', amount);
-    return sum + amount;
-  }, 0);
   
+  const totalTransactions = transactions.length;
+  
+  // CORREÇÃO: Considerar apenas transações PAGAS para receita total
+  const paidTransactions = transactions.filter(tx => tx.status === 'paid');
+  console.log('💰 [INDICADORES] Transações pagas:', paidTransactions.length);
+  
+  const totalRevenue = paidTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
   const totalFees = paidTransactions.reduce((sum, tx) => sum + (tx.fee || 0), 0);
   const netRevenue = totalRevenue - totalFees;
   
-  // Calcular por método de pagamento (apenas transações pagas)
+  console.log('💰 [INDICADORES] Receitas:', { totalRevenue, totalFees, netRevenue });
+  
+  // CORREÇÃO: Considerar apenas transações PAGAS para cálculos por método
   const pixTransactions = paidTransactions.filter(tx => tx.payment_method === 'pix');
   const cardTransactions = paidTransactions.filter(tx => tx.payment_method === 'credit_card');
   const debitTransactions = paidTransactions.filter(tx => tx.payment_method === 'debit_card');
@@ -147,16 +138,16 @@ export const calculateFinancialIndicators = (
   
   const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
   
-  // Taxa de aprovação (considerando todas as transações, não só as pagas)
-  const allTransactions = transactions.length;
+  // Calcular taxa de aprovação
   const approvedTransactions = transactions.filter(tx => tx.status === 'paid' || tx.status === 'processing');
-  const approvalRate = allTransactions > 0 ? (approvedTransactions.length / allTransactions) * 100 : 0;
+  const approvalRate = totalTransactions > 0 ? (approvedTransactions.length / totalTransactions) * 100 : 0;
   
-  // Taxa de estorno
+  // Calcular taxa de estorno
   const refundedTransactions = transactions.filter(tx => tx.status === 'refunded');
-  const refundRate = allTransactions > 0 ? (refundedTransactions.length / allTransactions) * 100 : 0;
+  const refundRate = totalTransactions > 0 ? (refundedTransactions.length / totalTransactions) * 100 : 0;
   
   // Receita de hoje (apenas transações pagas)
+  const today = new Date();
   const todayRevenue = paidTransactions
     .filter(tx => isToday(tx.created_at))
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -166,16 +157,14 @@ export const calculateFinancialIndicators = (
     .filter(tx => isThisMonth(tx.created_at))
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
   
-  // Valores pendentes e disponíveis das operações
-  const pendingOperations = operations.filter(op => 
-    op.status === 'waiting_payment' || op.status === 'processing'
-  );
+  // Valores pendentes e disponíveis
+  const pendingOperations = operations.filter(op => op.status === 'waiting_payment' || op.status === 'processing');
   const pendingAmount = pendingOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
   
   const availableOperations = operations.filter(op => op.status === 'paid');
   const availableAmount = availableOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
   
-  const indicators = {
+  return {
     totalRevenue,
     totalFees,
     netRevenue,
@@ -192,9 +181,6 @@ export const calculateFinancialIndicators = (
     pendingAmount,
     availableAmount
   };
-
-  console.log('📈 Indicadores calculados:', indicators);
-  return indicators;
 };
 
 // Função para aplicar filtros

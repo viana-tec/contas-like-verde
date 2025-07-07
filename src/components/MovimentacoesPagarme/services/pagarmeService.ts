@@ -1,13 +1,17 @@
+
 /**
  * Serviços para comunicação com a API do Pagar.me via Supabase Edge Function
- * VERSÃO OTIMIZADA COM CACHE E COLETA INTELIGENTE
+ * VERSÃO OTIMIZADA COM COLETA MASSIVA ILIMITADA
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { validateApiKey } from '../utils/pagarmeUtils';
-import { dataCache } from './dataCache';
 
-// Função para fazer requisições à API com cache inteligente
+// Cache inteligente para evitar re-coletas desnecessárias
+const dataCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+// Função para fazer requisições à API com retry inteligente
 export const makeApiRequest = async (endpoint: string, apiKey: string, retryCount = 0): Promise<any> => {
   if (!apiKey?.trim()) {
     throw new Error('Chave API não configurada');
@@ -17,13 +21,12 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
     throw new Error('Chave API inválida');
   }
 
-  // Verificar cache primeiro
-  const cacheKey = dataCache.generateKey(apiKey, endpoint);
-  const cachedData = dataCache.get(cacheKey);
+  const cacheKey = `${apiKey}_${endpoint}`;
+  const cached = dataCache.get(cacheKey);
   
-  if (cachedData) {
+  if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
     console.log(`📦 [CACHE] Usando dados em cache para: ${endpoint}`);
-    return cachedData;
+    return cached.data;
   }
 
   console.log(`🚀 [API] Requisição para: ${endpoint} (tentativa ${retryCount + 1})`);
@@ -48,7 +51,7 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
       
       // Retry para rate limit
       if ((data.error.includes('429') || data.error.includes('rate') || data.error.includes('Limite')) && retryCount < 3) {
-        const delay = Math.pow(2, retryCount) * 2000;
+        const delay = Math.pow(2, retryCount) * 2000; // Backoff exponencial
         console.log(`⏳ [RETRY] Aguardando ${delay}ms antes da tentativa ${retryCount + 2}...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return makeApiRequest(endpoint, apiKey, retryCount + 1);
@@ -57,8 +60,12 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
       throw new Error(data.details || data.error);
     }
 
-    // Armazenar no cache (15 minutos para dados dinâmicos)
-    dataCache.set(cacheKey, data, 15 * 60 * 1000);
+    // Cache da resposta
+    dataCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      ttl: CACHE_TTL
+    });
 
     console.log('✅ [API] Sucesso!');
     return data;
@@ -198,32 +205,19 @@ export const testConnection = async (apiKey: string): Promise<void> => {
   console.log('✅ [TESTE] Conexão OK:', data);
 };
 
-// Função OTIMIZADA para buscar dados com cache inteligente
+// Função MASSIVA para buscar TODOS os dados de MÚLTIPLOS endpoints - VERSÃO DEFINITIVA
 export const fetchAllData = async (
   apiKey: string, 
-  onProgress?: (stage: string, current: number, total: number, info: string) => void,
-  forceRefresh: boolean = false
+  onProgress?: (stage: string, current: number, total: number, info: string) => void
 ) => {
-  console.log('🚀 [MASTER] Iniciando coleta otimizada com cache...');
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA ILIMITADA DEFINITIVA...');
   
-  const masterCacheKey = dataCache.generateKey(apiKey, 'master_data');
+  // Período estendido de 12 meses para capturar TODOS os dados históricos
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const dateParam = twelveMonthsAgo.toISOString().split('T')[0];
   
-  // Se não for refresh forçado, tentar usar cache
-  if (!forceRefresh) {
-    const cachedMasterData = dataCache.get(masterCacheKey);
-    if (cachedMasterData) {
-      console.log('📦 [MASTER] Usando dados completos do cache');
-      onProgress?.('Cache', 4, 4, 'Dados carregados do cache');
-      return cachedMasterData;
-    }
-  }
-
-  // Período otimizado - últimos 6 meses para otimizar performance
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const dateParam = sixMonthsAgo.toISOString().split('T')[0];
-  
-  console.log(`📅 [MASTER] Período otimizado: ${dateParam} até hoje (6 meses)`);
+  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (12 meses)`);
   
   try {
     // FASE 1: Coleta PARALELA OTIMIZADA
@@ -257,7 +251,7 @@ export const fetchAllData = async (
       directTransactions: directTransactionsData.length
     });
     
-    // FASE 2: Processamento de transações dos orders
+    // FASE 2: Processamento inteligente de transações
     console.log('🚀 [FASE 2] Processando transações dos orders...');
     onProgress?.('Processando dados', 3, 4, 'Extraindo transações dos pedidos...');
     
@@ -299,16 +293,6 @@ export const fetchAllData = async (
     console.log('🚀 [FASE 4] Buscando saldo atualizado...');
     const balanceData = await fetchBalance(apiKey);
     
-    const finalData = {
-      payablesData,
-      transactionsData: uniqueTransactions,
-      ordersData,
-      balanceData
-    };
-    
-    // Armazenar resultado no cache master (30 minutos)
-    dataCache.set(masterCacheKey, finalData, 30 * 60 * 1000);
-    
     const finalStats = {
       payables: payablesData.length,
       orders: ordersData.length,
@@ -319,13 +303,18 @@ export const fetchAllData = async (
       totalOperations: payablesData.length + ordersData.length
     };
     
-    console.log(`🎯 [MASTER] COLETA OTIMIZADA FINALIZADA:`, finalStats);
+    console.log(`🎯 [MASTER] COLETA DEFINITIVA FINALIZADA:`, finalStats);
     onProgress?.('Concluído', 4, 4, `${finalStats.totalOperations} operações coletadas!`);
 
-    return finalData;
+    return {
+      payablesData,
+      transactionsData: uniqueTransactions,
+      ordersData,
+      balanceData
+    };
     
   } catch (error: any) {
     console.error('💥 [MASTER] Erro crítico:', error);
-    throw new Error(`Erro na coleta otimizada: ${error.message}`);
+    throw new Error(`Erro na coleta massiva: ${error.message}`);
   }
 };

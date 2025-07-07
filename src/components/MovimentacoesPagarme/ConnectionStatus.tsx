@@ -2,165 +2,170 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, RefreshCw, XCircle, AlertCircle, Key, Globe, Shield, ExternalLink } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  RefreshCw, 
+  Wifi, 
+  WifiOff,
+  Database,
+  TrendingUp
+} from 'lucide-react';
 import { ConnectionStatus as ConnectionStatusType } from './types';
 
 interface ConnectionStatusProps {
   status: ConnectionStatusType;
-  errorDetails: string;
+  errorDetails?: string;
   loading: boolean;
   onRefresh: () => void;
+  // Novos props para progresso detalhado
+  progressInfo?: {
+    stage: string;
+    current: number;
+    total: number;
+    info: string;
+  };
 }
 
-export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
-  status,
-  errorDetails,
-  loading,
-  onRefresh
+export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ 
+  status, 
+  errorDetails, 
+  loading, 
+  onRefresh,
+  progressInfo 
 }) => {
-  const getConnectionStatusColor = () => {
+  const getStatusConfig = () => {
     switch (status) {
-      case 'connected': return 'text-green-400';
-      case 'connecting': return 'text-yellow-400';
-      case 'error': return 'text-red-400';
-      default: return 'text-gray-400';
+      case 'connected':
+        return {
+          icon: CheckCircle,
+          title: '✅ Conectado à API Pagar.me',
+          description: 'Dados atualizados e disponíveis',
+          bgColor: 'bg-green-900/20',
+          borderColor: 'border-green-600',
+          textColor: 'text-green-400'
+        };
+      case 'connecting':
+        return {
+          icon: Loader2,
+          title: '🔄 Conectando...',
+          description: 'Estabelecendo conexão com a API',
+          bgColor: 'bg-blue-900/20',
+          borderColor: 'border-blue-600',
+          textColor: 'text-blue-400'
+        };
+      case 'error':
+        return {
+          icon: XCircle,
+          title: '❌ Erro de Conexão',
+          description: errorDetails || 'Falha na comunicação com a API',
+          bgColor: 'bg-red-900/20',
+          borderColor: 'border-red-600',
+          textColor: 'text-red-400'
+        };
+      default:
+        return {
+          icon: WifiOff,
+          title: '⚠️ Não Conectado',
+          description: 'Configure sua chave API para conectar',
+          bgColor: 'bg-gray-900/20',
+          borderColor: 'border-gray-600',
+          textColor: 'text-gray-400'
+        };
     }
   };
 
-  const getConnectionStatusText = () => {
-    switch (status) {
-      case 'connected': return 'Conectado à API Pagar.me ✅';
-      case 'connecting': return 'Conectando à API Pagar.me...';
-      case 'error': return 'Erro na conexão com a API ❌';
-      default: return 'Não conectado';
-    }
-  };
-
-  const getConnectionStatusIcon = () => {
-    switch (status) {
-      case 'connected': return <CheckCircle size={20} className="text-green-400" />;
-      case 'connecting': return <RefreshCw size={20} className="text-yellow-400 animate-spin" />;
-      case 'error': return <XCircle size={20} className="text-red-400" />;
-      default: return <AlertCircle size={20} className="text-gray-400" />;
-    }
-  };
+  const config = getStatusConfig();
+  const Icon = config.icon;
 
   return (
-    <Card className="bg-[#1a1a1a] border-gray-800">
+    <Card className={`${config.bgColor} ${config.borderColor} bg-[#1a1a1a]`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {getConnectionStatusIcon()}
-            <span className={`font-medium ${getConnectionStatusColor()}`}>
-              {getConnectionStatusText()}
-            </span>
+            <Icon 
+              size={24} 
+              className={`${config.textColor} ${status === 'connecting' ? 'animate-spin' : ''}`} 
+            />
+            <div>
+              <h3 className={`font-semibold ${config.textColor}`}>
+                {config.title}
+              </h3>
+              <p className="text-gray-400 text-sm">
+                {config.description}
+              </p>
+            </div>
           </div>
-          {status === 'connected' && (
-            <Button 
-              onClick={onRefresh} 
-              disabled={loading}
+          
+          {status === 'connected' && !loading && (
+            <Button
+              onClick={onRefresh}
+              variant="outline"
               size="sm"
-              className="bg-[#39FF14] text-black hover:bg-[#32E012]"
+              className="border-gray-600 hover:border-gray-500"
             >
-              {loading ? (
-                <RefreshCw size={16} className="animate-spin mr-2" />
-              ) : null}
-              {loading ? 'Coletando dados...' : 'Atualizar Dados'}
+              <RefreshCw size={16} className="mr-2" />
+              Atualizar
             </Button>
           )}
         </div>
-        
-        {/* Progress indicator durante loading */}
-        {loading && status === 'connected' && (
-          <div className="mt-4 p-4 bg-blue-900/20 border border-blue-600 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-blue-400 text-sm font-medium">Coletando dados da API Pagar.me...</span>
-              <RefreshCw size={16} className="text-blue-400 animate-spin" />
+
+        {/* Indicador de progresso detalhado */}
+        {loading && progressInfo && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-300 font-medium">
+                {progressInfo.stage}
+              </span>
+              <span className="text-gray-400">
+                {progressInfo.current}/{progressInfo.total}
+              </span>
             </div>
-            <div className="text-blue-300 text-xs space-y-1">
-              <p>📊 Buscando payables, orders e transações</p>
-              <p>🔄 Processando paginação automática</p>
-              <p>💰 Calculando saldos e indicadores</p>
-              <p className="text-yellow-300">⏳ Este processo pode levar alguns minutos...</p>
+            
+            <Progress 
+              value={(progressInfo.current / progressInfo.total) * 100} 
+              className="h-2"
+            />
+            
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <Database size={14} />
+              <span>{progressInfo.info}</span>
             </div>
           </div>
         )}
-        
-        {errorDetails && (
-          <div className="mt-4 space-y-4">
-            <div className="p-4 bg-red-900/20 border border-red-600 rounded-lg">
-              <p className="text-red-400 text-sm font-medium mb-2 flex items-center gap-2">
-                <XCircle size={16} />
-                Detalhes do erro:
-              </p>
-              <p className="text-red-300 text-sm mb-3">{errorDetails}</p>
+
+        {/* Loading genérico (quando não há progressInfo) */}
+        {loading && !progressInfo && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-blue-400">
+              <Loader2 size={16} className="animate-spin" />
+              <span>Carregando dados da API...</span>
             </div>
+            <Progress value={undefined} className="h-2" />
+          </div>
+        )}
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-900/20 border border-blue-600 rounded-lg">
-                <p className="text-blue-400 text-sm font-medium mb-2 flex items-center gap-2">
-                  <Key size={16} />
-                  Sobre as chaves da Pagar.me:
-                </p>
-                <ul className="text-blue-300 text-xs space-y-1">
-                  <li>🔑 <strong>Chaves de API:</strong> Obtidas no dashboard Pagar.me</li>
-                  <li>📏 <strong>Tamanho:</strong> Deve ter pelo menos 20 caracteres</li>
-                  <li>✅ <strong>Status:</strong> Deve estar ativa na sua conta</li>
-                  <li>🔐 <strong>Tipo:</strong> Usar chaves de produção ou teste</li>
-                  <li>🎯 <strong>Permissões:</strong> Deve ter acesso a payables e transactions</li>
-                </ul>
-              </div>
+        {/* Status de erro detalhado */}
+        {status === 'error' && errorDetails && (
+          <div className="mt-3 p-3 bg-red-900/10 border border-red-600/30 rounded">
+            <p className="text-red-300 text-sm font-mono">
+              {errorDetails}
+            </p>
+          </div>
+        )}
 
-              <div className="p-4 bg-purple-900/20 border border-purple-600 rounded-lg">
-                <p className="text-purple-400 text-sm font-medium mb-2 flex items-center gap-2">
-                  <Globe size={16} />
-                  Problemas comuns:
-                </p>
-                <ul className="text-purple-300 text-xs space-y-1">
-                  <li>• Chave inválida ou não encontrada</li>
-                  <li>• Conta Pagar.me inativa ou suspensa</li>
-                  <li>• Limites de requisições excedidos</li>
-                  <li>• Problemas de conectividade</li>
-                  <li>• Chave sem permissões necessárias</li>
-                  <li>• Formato incorreto da chave API</li>
-                </ul>
-              </div>
+        {/* Estatísticas de conexão (quando conectado) */}
+        {status === 'connected' && !loading && (
+          <div className="mt-3 flex items-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-1">
+              <Wifi size={12} />
+              <span>API Ativa</span>
             </div>
-
-            <div className="p-4 bg-green-900/20 border border-green-600 rounded-lg">
-              <p className="text-green-400 text-sm font-medium mb-2 flex items-center gap-2">
-                <Shield size={16} />
-                Como resolver:
-              </p>
-              <ul className="text-green-300 text-xs space-y-1">
-                <li>🔑 <strong>Dashboard:</strong> Acesse o dashboard da Pagar.me e copie uma chave válida</li>
-                <li>✅ <strong>Verificar:</strong> Confirme se a chave está ativa e com permissões</li>
-                <li>📊 <strong>Demo:</strong> Use o modo "Demo" para testar a interface</li>
-                <li>🔄 <strong>Aguardar:</strong> Problemas temporários podem se resolver automaticamente</li>
-                <li>🔍 <strong>Logs:</strong> Verifique o console do navegador para mais detalhes</li>
-                <li>📞 <strong>Suporte:</strong> Contate o suporte da Pagar.me se o problema persistir</li>
-              </ul>
-              
-              <div className="mt-3 pt-3 border-t border-green-700">
-                <a 
-                  href="https://dashboard.pagar.me/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-green-300 hover:text-green-200 text-xs mr-4"
-                >
-                  <ExternalLink size={12} />
-                  Dashboard Pagar.me
-                </a>
-                <a 
-                  href="https://docs.pagar.me/docs/chaves-de-acesso" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-green-300 hover:text-green-200 text-xs"
-                >
-                  <ExternalLink size={12} />
-                  Documentação das Chaves
-                </a>
-              </div>
+            <div className="flex items-center gap-1">
+              <TrendingUp size={12} />
+              <span>Dados Atualizados</span>
             </div>
           </div>
         )}

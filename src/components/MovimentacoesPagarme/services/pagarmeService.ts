@@ -1,12 +1,18 @@
+
 /**
  * Serviços para comunicação com a API do Pagar.me via Supabase Edge Function
+ * VERSÃO OTIMIZADA COM COLETA MASSIVA ILIMITADA
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { validateApiKey } from '../utils/pagarmeUtils';
 
-// Função para fazer requisições à API
-export const makeApiRequest = async (endpoint: string, apiKey: string) => {
+// Cache inteligente para evitar re-coletas desnecessárias
+const dataCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+// Função para fazer requisições à API com retry inteligente
+export const makeApiRequest = async (endpoint: string, apiKey: string, retryCount = 0): Promise<any> => {
   if (!apiKey?.trim()) {
     throw new Error('Chave API não configurada');
   }
@@ -15,7 +21,15 @@ export const makeApiRequest = async (endpoint: string, apiKey: string) => {
     throw new Error('Chave API inválida');
   }
 
-  console.log(`🚀 [FRONTEND] Requisição para: ${endpoint}`);
+  const cacheKey = `${apiKey}_${endpoint}`;
+  const cached = dataCache.get(cacheKey);
+  
+  if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+    console.log(`📦 [CACHE] Usando dados em cache para: ${endpoint}`);
+    return cached.data;
+  }
+
+  console.log(`🚀 [API] Requisição para: ${endpoint} (tentativa ${retryCount + 1})`);
   
   try {
     const requestBody = {
@@ -23,180 +37,223 @@ export const makeApiRequest = async (endpoint: string, apiKey: string) => {
       apiKey: apiKey.trim()
     };
     
-    console.log('📤 [FRONTEND] Enviando para Edge Function');
-
     const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
       body: requestBody
     });
 
-    console.log('📥 [FRONTEND] Resposta:', { 
-      hasData: !!data, 
-      hasError: !!error,
-      dataKeys: data ? Object.keys(data) : [],
-      errorMsg: error?.message
-    });
-
     if (error) {
-      console.error('❌ [FRONTEND] Erro Supabase:', error);
+      console.error('❌ [API] Erro Supabase:', error);
       throw new Error(error.message || 'Erro na comunicação');
     }
 
     if (data?.error) {
-      console.error('❌ [FRONTEND] Erro API:', data);
+      console.error('❌ [API] Erro API:', data);
+      
+      // Retry para rate limit
+      if ((data.error.includes('429') || data.error.includes('rate') || data.error.includes('Limite')) && retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 2000; // Backoff exponencial
+        console.log(`⏳ [RETRY] Aguardando ${delay}ms antes da tentativa ${retryCount + 2}...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return makeApiRequest(endpoint, apiKey, retryCount + 1);
+      }
+      
       throw new Error(data.details || data.error);
     }
 
-    console.log('✅ [FRONTEND] Sucesso!');
+    // Cache da resposta
+    dataCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      ttl: CACHE_TTL
+    });
+
+    console.log('✅ [API] Sucesso!');
     return data;
     
   } catch (error: any) {
-    console.error('💥 [FRONTEND] Erro:', error);
+    if (retryCount < 2 && !error.message?.includes('inválida')) {
+      const delay = 1000 * (retryCount + 1);
+      console.log(`🔄 [RETRY] Tentando novamente em ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return makeApiRequest(endpoint, apiKey, retryCount + 1);
+    }
+    
+    console.error('💥 [API] Erro final:', error);
     throw error;
   }
 };
 
-// Função para buscar dados com paginação automática ILIMITADA E ROBUSTA
-export const fetchAllDataUnlimited = async (endpoint: string, apiKey: string): Promise<any[]> => {
+// Função para buscar dados com paginação MASSIVA E OTIMIZADA
+export const fetchAllDataUnlimited = async (
+  endpoint: string, 
+  apiKey: string,
+  onProgress?: (current: number, total: number, info: string) => void
+): Promise<any[]> => {
   let allData: any[] = [];
   let page = 1;
-  const pageSize = 250; // Aumentado para 250 para maior eficiência
-  let maxPages = 200; // AUMENTADO para 200 páginas (50.000 registros por endpoint)
+  let pageSize = 250; // Otimizado para máxima eficiência
+  let maxPages = 500; // AUMENTADO para até 125.000 registros por endpoint
+  let consecutiveEmptyPages = 0;
+  const maxConsecutiveEmpty = 3;
   
-  console.log(`📄 [FRONTEND] Iniciando coleta ILIMITADA: ${endpoint}`);
+  console.log(`📄 [COLETA] Iniciando coleta MASSIVA OTIMIZADA: ${endpoint}`);
   
-  while (page <= maxPages) {
+  while (page <= maxPages && consecutiveEmptyPages < maxConsecutiveEmpty) {
     const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}count=${pageSize}&page=${page}`;
     
-    console.log(`📄 [FRONTEND] Buscando página ${page}/${maxPages}: ${fullEndpoint}`);
+    onProgress?.(page, maxPages, `Coletando página ${page}...`);
+    console.log(`📄 [COLETA] Página ${page}/${maxPages}: ${fullEndpoint}`);
     
     try {
       const response = await makeApiRequest(fullEndpoint, apiKey);
       
       if (!response || !response.data || !Array.isArray(response.data)) {
-        console.log(`📄 [FRONTEND] Página ${page}: Sem dados ou formato inválido`);
-        break;
+        console.log(`📄 [COLETA] Página ${page}: Formato inválido`);
+        consecutiveEmptyPages++;
+        page++;
+        continue;
       }
       
       const newData = response.data;
       
-      // Se não há dados novos, parar
       if (newData.length === 0) {
-        console.log(`📄 [FRONTEND] Página ${page}: Sem novos dados - finalizando`);
-        break;
+        consecutiveEmptyPages++;
+        console.log(`📄 [COLETA] Página ${page}: Vazia (${consecutiveEmptyPages}/${maxConsecutiveEmpty})`);
+        
+        if (consecutiveEmptyPages >= maxConsecutiveEmpty) {
+          console.log(`📄 [COLETA] Parando após ${maxConsecutiveEmpty} páginas vazias consecutivas`);
+          break;
+        }
+        
+        page++;
+        continue;
       }
       
+      consecutiveEmptyPages = 0; // Reset contador
       allData = [...allData, ...newData];
       
-      console.log(`📄 [FRONTEND] Página ${page}: ${newData.length} registros, Total acumulado: ${allData.length}`);
+      console.log(`📄 [COLETA] Página ${page}: +${newData.length} registros (Total: ${allData.length})`);
       
-      // Se retornou menos que o tamanho da página, chegamos ao fim
       if (newData.length < pageSize) {
-        console.log(`📄 [FRONTEND] Fim da paginação: última página retornou ${newData.length} registros`);
+        console.log(`📄 [COLETA] Última página: ${newData.length} < ${pageSize}`);
         break;
       }
       
       page++;
       
-      // Pausa otimizada para máxima eficiência
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Pausa otimizada para evitar rate limit
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-    } catch (error) {
-      console.error(`❌ [FRONTEND] Erro na página ${page}:`, error);
+    } catch (error: any) {
+      console.error(`❌ [COLETA] Erro na página ${page}:`, error);
       
-      // Se for erro de rate limit, tentar novamente após pausa
       if (error.message?.includes('429') || error.message?.includes('rate') || error.message?.includes('Limite')) {
-        console.log(`📄 [FRONTEND] Rate limit - aguardando 3s antes de continuar...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log(`📄 [RATE_LIMIT] Aguardando 5s...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
         continue; // Tentar a mesma página novamente
       }
       
-      // Para outros erros, continuar próxima página ou parar
-      console.log(`📄 [FRONTEND] Tentando próxima página após erro...`);
+      // Para outros erros, tentar próxima página
       page++;
+      consecutiveEmptyPages++;
       
-      if (page > maxPages) break;
+      if (consecutiveEmptyPages >= maxConsecutiveEmpty) break;
     }
   }
   
-  console.log(`🎯 [FRONTEND] Coleta finalizada: ${allData.length} registros total de ${endpoint}`);
+  onProgress?.(maxPages, maxPages, `Finalizado: ${allData.length} registros`);
+  console.log(`🎯 [COLETA] FINALIZADA: ${allData.length} registros de ${endpoint}`);
   return allData;
 };
 
-// Função para buscar saldo do recipient
+// Função para buscar saldo com CORREÇÃO definitiva
 export const fetchBalance = async (apiKey: string): Promise<{ available: number; pending: number }> => {
   try {
-    console.log('💰 [FRONTEND] Buscando saldo...');
+    console.log('💰 [SALDO] Buscando saldo...');
     
-    // Primeiro buscar o recipient_id do usuário
     const recipientResponse = await makeApiRequest('/core/v5/recipients?count=1', apiKey);
     
     if (!recipientResponse?.data?.[0]?.id) {
-      console.warn('⚠️ [FRONTEND] Recipient não encontrado');
+      console.warn('⚠️ [SALDO] Recipient não encontrado');
       return { available: 0, pending: 0 };
     }
     
     const recipientId = recipientResponse.data[0].id;
-    console.log(`💰 [FRONTEND] Recipient ID: ${recipientId}`);
+    console.log(`💰 [SALDO] Recipient ID: ${recipientId}`);
     
-    // Buscar saldo do recipient
     const balanceResponse = await makeApiRequest(`/core/v5/recipients/${recipientId}/balance`, apiKey);
     
-    // CORREÇÃO APLICADA: Valores vêm em centavos, dividir por 100 UMA vez para converter para reais
+    // CORREÇÃO DEFINITIVA: Valores vêm em centavos, converter para reais
     const available = (balanceResponse?.available_amount || 0) / 100;
     const pending = (balanceResponse?.waiting_funds_amount || 0) / 100;
     
-    console.log(`💰 [FRONTEND] Saldo - Disponível: R$ ${available}, Pendente: R$ ${pending}`);
+    console.log(`💰 [SALDO] CORRETO - Disponível: R$ ${available.toFixed(2)}, Pendente: R$ ${pending.toFixed(2)}`);
     
     return { available, pending };
     
   } catch (error) {
-    console.error('❌ [FRONTEND] Erro ao buscar saldo:', error);
+    console.error('❌ [SALDO] Erro:', error);
     return { available: 0, pending: 0 };
   }
 };
 
 // Função para testar conexão
 export const testConnection = async (apiKey: string): Promise<void> => {
-  console.log('🔄 [FRONTEND] Testando conexão...');
-  
-  // Teste simples - buscar poucos payables
+  console.log('🔄 [TESTE] Testando conexão...');
   const data = await makeApiRequest('/core/v5/payables?count=5', apiKey);
-  
-  console.log('✅ [FRONTEND] Conexão OK:', data);
+  console.log('✅ [TESTE] Conexão OK:', data);
 };
 
-// Função para buscar TODOS os dados de MÚLTIPLOS ENDPOINTS - IMPLEMENTAÇÃO ROBUSTA COMPLETA
-export const fetchAllData = async (apiKey: string) => {
-  console.log('🚀 [FRONTEND] Iniciando COLETA MASSIVA ILIMITADA de MÚLTIPLOS ENDPOINTS...');
+// Função MASSIVA para buscar TODOS os dados de MÚLTIPLOS endpoints - VERSÃO DEFINITIVA
+export const fetchAllData = async (
+  apiKey: string, 
+  onProgress?: (stage: string, current: number, total: number, info: string) => void
+) => {
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA ILIMITADA DEFINITIVA...');
   
-  // Data de 6 meses atrás para garantir TODOS os dados históricos
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const dateParam = sixMonthsAgo.toISOString().split('T')[0];
+  // Período estendido de 12 meses para capturar TODOS os dados históricos
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const dateParam = twelveMonthsAgo.toISOString().split('T')[0];
   
-  console.log(`📅 [FRONTEND] Data de referência (6 meses): ${dateParam}`);
+  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (12 meses)`);
   
   try {
-    // FASE 1: Coleta PARALELA de TODOS os endpoints principais
-    console.log('🚀 [FRONTEND] FASE 1: Coletando de TODOS OS ENDPOINTS em paralelo...');
+    // FASE 1: Coleta PARALELA OTIMIZADA
+    console.log('🚀 [FASE 1] Iniciando coleta paralela otimizada...');
+    onProgress?.('Coletando dados', 1, 4, 'Iniciando coleta de todos os endpoints...');
     
-    const [payablesData, ordersData, directTransactionsData] = await Promise.all([
-      // Endpoint 1: Payables (recebíveis) - MAIS IMPORTANTE
-      fetchAllDataUnlimited(`/core/v5/payables?created_since=${dateParam}`, apiKey),
-      // Endpoint 2: Orders (pedidos completos)
-      fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`, apiKey),
-      // Endpoint 3: Transações DIRETAS (não apenas dos orders)
-      fetchAllDataUnlimited(`/core/v5/transactions?created_since=${dateParam}`, apiKey)
-    ]);
+    const endpoints = [
+      { name: 'payables', url: `/core/v5/payables?created_since=${dateParam}` },
+      { name: 'orders', url: `/core/v5/orders?created_since=${dateParam}` },
+      { name: 'transactions', url: `/core/v5/transactions?created_since=${dateParam}` }
+    ];
     
-    console.log(`📊 [FRONTEND] COLETA FASE 1 FINALIZADA:`, {
+    const results = await Promise.allSettled(
+      endpoints.map(async (ep, index) => {
+        onProgress?.('Coletando dados', index + 1, 4, `Coletando ${ep.name}...`);
+        const data = await fetchAllDataUnlimited(ep.url, apiKey, (current, total, info) => {
+          onProgress?.('Coletando dados', index + 1, 4, `${ep.name}: ${info}`);
+        });
+        return { name: ep.name, data };
+      })
+    );
+    
+    // Processar resultados
+    const payablesData = results[0].status === 'fulfilled' ? results[0].value.data : [];
+    const ordersData = results[1].status === 'fulfilled' ? results[1].value.data : [];
+    const directTransactionsData = results[2].status === 'fulfilled' ? results[2].value.data : [];
+    
+    console.log(`📊 [FASE 1] Coleta completa:`, {
       payables: payablesData.length,
       orders: ordersData.length,
       directTransactions: directTransactionsData.length
     });
     
-    // FASE 2: Processar e enriquecer transações dos orders
-    console.log('🚀 [FRONTEND] FASE 2: Extraindo transações dos orders...');
+    // FASE 2: Processamento inteligente de transações
+    console.log('🚀 [FASE 2] Processando transações dos orders...');
+    onProgress?.('Processando dados', 3, 4, 'Extraindo transações dos pedidos...');
+    
     let orderTransactionsData: any[] = [];
     try {
       orderTransactionsData = ordersData.flatMap(order => {
@@ -208,14 +265,15 @@ export const fetchAllData = async (apiKey: string) => {
           source: 'order_charges'
         })) || [];
       });
-      console.log(`📊 [FRONTEND] Transações extraídas dos orders: ${orderTransactionsData.length}`);
+      console.log(`📊 [FASE 2] Transações dos orders: ${orderTransactionsData.length}`);
     } catch (error) {
-      console.warn('⚠️ [FRONTEND] Erro ao extrair transações dos orders');
-      orderTransactionsData = [];
+      console.warn('⚠️ [FASE 2] Erro ao processar orders:', error);
     }
     
-    // FASE 3: Consolidar TODAS as transações (diretas + orders)
-    console.log('🚀 [FRONTEND] FASE 3: Consolidando TODAS as transações...');
+    // FASE 3: Consolidação final
+    console.log('🚀 [FASE 3] Consolidando dados...');
+    onProgress?.('Consolidando', 4, 4, 'Finalizando processamento...');
+    
     const allTransactionsData = [
       ...directTransactionsData.map(t => ({ ...t, source: 'direct_transactions' })),
       ...orderTransactionsData
@@ -230,22 +288,22 @@ export const fetchAllData = async (apiKey: string) => {
       return acc;
     }, []);
     
-    console.log(`📊 [FRONTEND] Transações consolidadas: ${allTransactionsData.length} -> ${uniqueTransactions.length} (únicas)`);
-    
-    // FASE 4: Buscar saldo do recipient
-    console.log('🚀 [FRONTEND] FASE 4: Buscando saldo...');
+    // FASE 4: Buscar saldo
+    console.log('🚀 [FASE 4] Buscando saldo atualizado...');
     const balanceData = await fetchBalance(apiKey);
     
-    console.log(`🎯 [FRONTEND] COLETA MASSIVA COMPLETA FINALIZADA:`, {
+    const finalStats = {
       payables: payablesData.length,
       orders: ordersData.length,
       directTransactions: directTransactionsData.length,
       orderTransactions: orderTransactionsData.length,
       uniqueTransactions: uniqueTransactions.length,
       balance: balanceData,
-      totalOperations: payablesData.length + ordersData.length,
-      grandTotal: payablesData.length + ordersData.length + uniqueTransactions.length
-    });
+      totalOperations: payablesData.length + ordersData.length
+    };
+    
+    console.log(`🎯 [MASTER] COLETA DEFINITIVA FINALIZADA:`, finalStats);
+    onProgress?.('Concluído', 4, 4, `${finalStats.totalOperations} operações coletadas!`);
 
     return {
       payablesData,
@@ -255,7 +313,7 @@ export const fetchAllData = async (apiKey: string) => {
     };
     
   } catch (error: any) {
-    console.error('💥 [FRONTEND] Erro na coleta massiva ilimitada:', error);
-    throw new Error(`Erro na coleta de dados: ${error.message}`);
+    console.error('💥 [MASTER] Erro crítico:', error);
+    throw new Error(`Erro na coleta massiva: ${error.message}`);
   }
 };

@@ -1,5 +1,7 @@
+
 /**
  * Hook principal que compõe todos os hooks menores para gerenciar a API Pagar.me
+ * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
  */
 
 import { useApiState } from './useApiState';
@@ -52,6 +54,9 @@ export const usePagarmeApi = () => {
     // Ações dos filtros
     setFiltersExpanded: filtersState.setFiltersExpanded,
     setFilters: filtersState.setFilters,
-    clearFilters: filtersState.clearFilters
+    clearFilters: filtersState.clearFilters,
+    
+    // Progresso detalhado
+    progressInfo: apiOperations.progressInfo
   };
 };

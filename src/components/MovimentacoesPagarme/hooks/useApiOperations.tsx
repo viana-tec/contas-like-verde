@@ -1,5 +1,7 @@
+
 /**
  * Hook para operações da API Pagar.me
+ * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
  */
 
 import { useToast } from '@/hooks/use-toast';
@@ -7,6 +9,7 @@ import { BalanceOperation, Transaction } from '../types';
 import { getMockOperations, getMockTransactions } from '../mockData';
 import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
 import { testConnection, fetchAllData } from '../services/pagarmeService';
+import { useState } from 'react';
 
 interface UseApiOperationsProps {
   apiKey: string;
@@ -30,6 +33,14 @@ export const useApiOperations = ({
   setErrorDetails
 }: UseApiOperationsProps) => {
   const { toast } = useToast();
+  
+  // Estado para progresso detalhado
+  const [progressInfo, setProgressInfo] = useState<{
+    stage: string;
+    current: number;
+    total: number;
+    info: string;
+  } | null>(null);
 
   const saveApiKey = () => {
     if (!apiKey.trim()) {
@@ -81,11 +92,13 @@ export const useApiOperations = ({
 
     setConnectionStatus('connecting');
     setErrorDetails('');
+    setProgressInfo({ stage: 'Testando conexão', current: 1, total: 2, info: 'Verificando API...' });
     
     try {
       await testConnection(apiKey);
       
       setConnectionStatus('connected');
+      setProgressInfo(null);
       
       toast({
         title: "Conexão estabelecida",
@@ -99,6 +112,7 @@ export const useApiOperations = ({
       console.error('❌ [FRONTEND] Erro conexão:', error);
       setConnectionStatus('error');
       setErrorDetails(error.message || 'Erro desconhecido');
+      setProgressInfo(null);
       
       toast({
         title: "Erro de conexão",
@@ -148,9 +162,15 @@ export const useApiOperations = ({
 
     setLoading(true);
     setErrorDetails('');
+    setProgressInfo({ stage: 'Iniciando coleta', current: 0, total: 4, info: 'Preparando...' });
     
     try {
-      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey);
+      // Função de callback para atualizar progresso
+      const onProgress = (stage: string, current: number, total: number, info: string) => {
+        setProgressInfo({ stage, current, total, info });
+      };
+
+      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey, onProgress);
       
       console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
         ordersRaw: ordersData.length,
@@ -159,14 +179,16 @@ export const useApiOperations = ({
         balance: balanceData
       });
       
+      setProgressInfo({ stage: 'Processando dados', current: 4, total: 4, info: 'Formatando operações...' });
+      
       // Mapear orders para operações E payables para operações também 
       const orderOperations = mapOrdersToOperations(ordersData);
       const payableOperations = mapPayablesToOperations(payablesData);
       
-      // Combinar todas as operações (FIRST orders, THEN payables para evitar duplicatas)
+      // Combinar todas as operações
       const allOperations = [...orderOperations, ...payableOperations];
       
-      // Converter transações com correção de valores
+      // Converter transações
       const formattedTransactions = mapTransactions(transactionsData);
       
       // Atualizar estados
@@ -186,15 +208,18 @@ export const useApiOperations = ({
         sampleTransaction: formattedTransactions[0]
       });
       
+      setProgressInfo(null);
+      
       toast({
         title: "🎉 Dados carregados com sucesso!",
-        description: `${allOperations.length} operações e ${formattedTransactions.length} transações. Saldo: R$ ${balanceData.available.toFixed(2)}`,
+        description: `${allOperations.length} operações e ${formattedTransactions.length} transações coletadas!`,
       });
       
     } catch (error: any) {
       console.error('❌ [FRONTEND] Erro buscar dados:', error);
       setErrorDetails(error.message || 'Erro ao buscar dados');
       setConnectionStatus('error');
+      setProgressInfo(null);
       
       toast({
         title: "Erro ao carregar",
@@ -210,6 +235,7 @@ export const useApiOperations = ({
     saveApiKey,
     testConnection: handleTestConnection,
     loadDemoData,
-    fetchData
+    fetchData,
+    progressInfo
   };
 };

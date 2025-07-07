@@ -28,6 +28,7 @@ export const MovimentacoesPagarme = () => {
     filters,
     financialIndicators,
     hasData,
+    progressInfo,
     
     // Ações
     setApiKey,
@@ -60,6 +61,7 @@ export const MovimentacoesPagarme = () => {
         errorDetails={errorDetails}
         loading={loading}
         onRefresh={fetchData}
+        progressInfo={progressInfo}
       />
 
       {!apiKey && (

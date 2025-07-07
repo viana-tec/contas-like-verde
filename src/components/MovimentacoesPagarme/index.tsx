@@ -223,6 +223,35 @@ export const MovimentacoesPagarme = () => {
     }
   };
 
+  // Função para buscar dados com paginação automática
+  const fetchAllData = async (endpoint: string, allData: any[] = [], page: number = 1): Promise<any[]> => {
+    const pageSize = 250; // Tamanho da página
+    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}count=${pageSize}&page=${page}`;
+    
+    console.log(`📄 [FRONTEND] Buscando página ${page}: ${fullEndpoint}`);
+    
+    const response = await makeApiRequest(fullEndpoint);
+    
+    if (!response || !response.data) {
+      console.log(`📄 [FRONTEND] Página ${page}: Sem dados`);
+      return allData;
+    }
+    
+    const newData = response.data || [];
+    const combinedData = [...allData, ...newData];
+    
+    console.log(`📄 [FRONTEND] Página ${page}: ${newData.length} registros, Total: ${combinedData.length}`);
+    
+    // Se retornou menos que o tamanho da página, chegamos ao fim
+    if (newData.length < pageSize) {
+      console.log(`📄 [FRONTEND] Coleta finalizada: ${combinedData.length} registros total`);
+      return combinedData;
+    }
+    
+    // Continuar para próxima página
+    return await fetchAllData(endpoint, combinedData, page + 1);
+  };
+
   const fetchData = async () => {
     if (!apiKey?.trim() || !validateApiKey(apiKey)) {
       toast({
@@ -237,53 +266,105 @@ export const MovimentacoesPagarme = () => {
     setErrorDetails('');
     
     try {
-      console.log('🔄 [FRONTEND] Buscando dados...');
+      console.log('🔄 [FRONTEND] Buscando dados dos últimos 30 dias...');
       
-      // Buscar todos os payables dos últimos 30 dias
+      // Data de 30 dias atrás
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dateParam = thirtyDaysAgo.toISOString().split('T')[0];
-      const payablesData = await makeApiRequest(`/core/v5/payables?count=1000&created_since=${dateParam}`);
       
-      if (!payablesData || !payablesData.data) {
-        throw new Error('Nenhum dado retornado da API');
-      }
-
-      console.log('📊 [FRONTEND] Dados recebidos:', {
-        total: payablesData.data?.length || 0,
-        firstItem: payablesData.data?.[0] || null
-      });
+      console.log(`📅 [FRONTEND] Data de referência: ${dateParam}`);
+      
+      // Buscar todos os payables dos últimos 30 dias com paginação
+      const allPayables = await fetchAllData(`/core/v5/payables?created_since=${dateParam}`);
+      
+      console.log(`📊 [FRONTEND] Total de payables coletados: ${allPayables.length}`);
       
       // Converter payables para operations com dados expandidos
-      const operationsFromPayables = (payablesData.data || []).map((payable: any, index: number) => ({
-        id: String(payable.id || `payable_${index}`),
-        type: payable.type || 'credit',
-        status: payable.status || 'unknown',
-        amount: Number(payable.amount) || 0,
-        fee: Number(payable.fee) || 0,
-        created_at: payable.created_at || new Date().toISOString(),
-        description: `${payable.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`,
-        // Dados expandidos do payable
-        payment_method: payable.payment_method || payable.transaction?.payment_method,
-        installments: payable.installments || payable.transaction?.installments,
-        acquirer_name: payable.acquirer_name || payable.transaction?.acquirer_name,
-        acquirer_response_code: payable.acquirer_response_code || payable.transaction?.acquirer_response_code,
-        authorization_code: payable.authorization_code || payable.transaction?.authorization_code,
-        tid: payable.tid || payable.transaction?.tid,
-        nsu: payable.nsu || payable.transaction?.nsu,
-        card_brand: payable.card_brand || payable.transaction?.card?.brand,
-        card_last_four_digits: payable.card_last_four_digits || payable.transaction?.card?.last_four_digits,
-        soft_descriptor: payable.soft_descriptor || payable.transaction?.soft_descriptor,
-        gateway_response_time: payable.gateway_response_time || payable.transaction?.gateway_response_time,
-        antifraud_score: payable.antifraud_score || payable.transaction?.antifraud_score
+      const operationsFromPayables = allPayables.map((payable: any, index: number) => {
+        // Extrair dados da transação aninhada
+        const transaction = payable.transaction || {};
+        const card = transaction.card || {};
+        
+        return {
+          id: String(payable.id || `payable_${index}`),
+          type: payable.type || 'credit',
+          status: payable.status || 'unknown',
+          amount: Number(payable.amount) || 0,
+          fee: Number(payable.fee) || 0,
+          created_at: payable.created_at || new Date().toISOString(),
+          description: `${transaction.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`,
+          // Dados expandidos do payable e transação
+          payment_method: payable.payment_method || transaction.payment_method,
+          installments: payable.installments || transaction.installments,
+          acquirer_name: payable.acquirer_name || transaction.acquirer_name,
+          acquirer_response_code: payable.acquirer_response_code || transaction.acquirer_response_code,
+          authorization_code: payable.authorization_code || transaction.authorization_code,
+          tid: payable.tid || transaction.tid,
+          nsu: payable.nsu || transaction.nsu,
+          card_brand: payable.card_brand || card.brand,
+          card_last_four_digits: payable.card_last_four_digits || card.last_four_digits,
+          soft_descriptor: payable.soft_descriptor || transaction.soft_descriptor,
+          gateway_response_time: payable.gateway_response_time || transaction.gateway_response_time,
+          antifraud_score: payable.antifraud_score || transaction.antifraud_score,
+          // Dados adicionais para melhor identificação
+          transaction_id: transaction.id,
+          reference_key: transaction.reference_key,
+          customer: transaction.customer,
+          billing: transaction.billing
+        };
+      });
+      
+      // Buscar transações também
+      let allTransactions: any[] = [];
+      try {
+        console.log('🔄 [FRONTEND] Buscando transações...');
+        allTransactions = await fetchAllData(`/core/v5/transactions?created_since=${dateParam}`);
+        console.log(`📊 [FRONTEND] Total de transações coletadas: ${allTransactions.length}`);
+      } catch (transactionError) {
+        console.warn('⚠️ [FRONTEND] Não foi possível buscar transações:', transactionError);
+        // Continuar sem transações se der erro
+      }
+      
+      // Converter transações
+      const formattedTransactions = allTransactions.map((transaction: any) => ({
+        id: String(transaction.id),
+        amount: Number(transaction.amount) || 0,
+        status: transaction.status || 'unknown',
+        payment_method: transaction.payment_method || 'unknown',
+        created_at: transaction.created_at || new Date().toISOString(),
+        paid_at: transaction.paid_at,
+        installments: transaction.installments,
+        acquirer_name: transaction.acquirer_name,
+        acquirer_response_code: transaction.acquirer_response_code,
+        authorization_code: transaction.authorization_code,
+        tid: transaction.tid,
+        nsu: transaction.nsu,
+        card_brand: transaction.card?.brand,
+        card_last_four_digits: transaction.card?.last_four_digits,
+        soft_descriptor: transaction.soft_descriptor,
+        gateway_response_time: transaction.gateway_response_time,
+        antifraud_score: transaction.antifraud_score,
+        reference_key: transaction.reference_key,
+        customer: transaction.customer,
+        billing: transaction.billing,
+        boleto: transaction.boleto,
+        pix: transaction.pix
       }));
       
       setOperations(operationsFromPayables);
-      setTransactions([]); // Limpar transações por enquanto
+      setTransactions(formattedTransactions);
+      
+      console.log(`✅ [FRONTEND] Dados carregados com sucesso:`, {
+        operations: operationsFromPayables.length,
+        transactions: formattedTransactions.length,
+        sampleOperation: operationsFromPayables[0],
+        sampleTransaction: formattedTransactions[0]
+      });
       
       toast({
         title: "Dados carregados",
-        description: `${operationsFromPayables.length} operações carregadas.`,
+        description: `${operationsFromPayables.length} operações e ${formattedTransactions.length} transações dos últimos 30 dias.`,
       });
       
     } catch (error: any) {

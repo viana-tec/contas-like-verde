@@ -1,8 +1,6 @@
 
 import { useState } from 'react';
-import { BalanceOperation, Transaction } from '../types';
-
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'idle';
+import { BalanceOperation, Transaction, ConnectionStatus } from '../types';
 
 export const useApiState = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');

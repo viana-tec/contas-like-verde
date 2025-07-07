@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { fetchAllData, testConnection as testApiConnection } from '../services/pagarmeService';
 import { dataCache } from '../services/dataCache';
-import { BalanceOperation, Transaction } from '../types';
+import { getMockOperations, getMockTransactions } from '../mockData';
+import { BalanceOperation, Transaction, ConnectionStatus } from '../types';
 
 interface UseApiOperationsProps {
   apiKey: string;
@@ -11,7 +12,7 @@ interface UseApiOperationsProps {
   setAvailableBalance: (balance: number) => void;
   setPendingBalance: (balance: number) => void;
   setLoading: (loading: boolean) => void;
-  setConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
+  setConnectionStatus: (status: ConnectionStatus) => void;
   setErrorDetails: (details: string | null) => void;
 }
 
@@ -65,7 +66,8 @@ export const useApiOperations = ({
     setConnectionStatus('connecting');
     
     try {
-      const { operations: mockOperations, transactions: mockTransactions } = await import('../mockData');
+      const mockOperations = getMockOperations();
+      const mockTransactions = getMockTransactions();
       
       setOperations(mockOperations);
       setTransactions(mockTransactions);

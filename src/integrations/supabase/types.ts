@@ -58,8 +58,12 @@ export type Database = {
       }
       boletos: {
         Row: {
+          account_number: string | null
+          agency_code: string | null
           amount: number
+          bank_code: string | null
           barcode: string
+          company_document: string | null
           company_name: string
           created_at: string
           digitable_line: string | null
@@ -71,8 +75,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_number?: string | null
+          agency_code?: string | null
           amount: number
+          bank_code?: string | null
           barcode: string
+          company_document?: string | null
           company_name: string
           created_at?: string
           digitable_line?: string | null
@@ -84,8 +92,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_number?: string | null
+          agency_code?: string | null
           amount?: number
+          bank_code?: string | null
           barcode?: string
+          company_document?: string | null
           company_name?: string
           created_at?: string
           digitable_line?: string | null
@@ -111,9 +123,12 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          payment_day_1: number | null
+          payment_day_2: number | null
           phone: string | null
           pix_key: string | null
           position: string
+          salary_advance: number | null
           status: string
           updated_at: string
         }
@@ -129,9 +144,12 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          payment_day_1?: number | null
+          payment_day_2?: number | null
           phone?: string | null
           pix_key?: string | null
           position: string
+          salary_advance?: number | null
           status?: string
           updated_at?: string
         }
@@ -147,9 +165,12 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          payment_day_1?: number | null
+          payment_day_2?: number | null
           phone?: string | null
           pix_key?: string | null
           position?: string
+          salary_advance?: number | null
           status?: string
           updated_at?: string
         }
@@ -261,6 +282,8 @@ export type Database = {
           name: string
           notes: string | null
           payment_date: number | null
+          payment_day_1: number | null
+          payment_day_2: number | null
           phone: string | null
           pix_key: string | null
           service_type: string
@@ -276,6 +299,8 @@ export type Database = {
           name: string
           notes?: string | null
           payment_date?: number | null
+          payment_day_1?: number | null
+          payment_day_2?: number | null
           phone?: string | null
           pix_key?: string | null
           service_type: string
@@ -291,6 +316,8 @@ export type Database = {
           name?: string
           notes?: string | null
           payment_date?: number | null
+          payment_day_1?: number | null
+          payment_day_2?: number | null
           phone?: string | null
           pix_key?: string | null
           service_type?: string

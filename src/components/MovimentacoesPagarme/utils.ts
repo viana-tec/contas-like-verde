@@ -1,4 +1,3 @@
-
 /**
  * Utilitários gerais para o componente MovimentacoesPagarme
  */
@@ -107,7 +106,6 @@ export const calculateFinancialIndicators = (
   operations: BalanceOperation[], 
   transactions: Transaction[]
 ): FinancialIndicators => {
-  const totalOperations = operations.length;
   const totalTransactions = transactions.length;
   
   const totalRevenue = operations.reduce((sum, op) => sum + (op.amount || 0), 0);
@@ -116,27 +114,58 @@ export const calculateFinancialIndicators = (
   
   const pixOperations = operations.filter(op => op.payment_method === 'pix');
   const cardOperations = operations.filter(op => op.payment_method === 'credit_card');
+  const debitOperations = operations.filter(op => op.payment_method === 'debit_card');
+  const boletoOperations = operations.filter(op => op.payment_method === 'boleto');
   
   const pixRevenue = pixOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
   const cardRevenue = cardOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
+  const debitRevenue = debitOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
+  const boletoRevenue = boletoOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
   
-  const avgTicket = totalOperations > 0 ? totalRevenue / totalOperations : 0;
-  const feePercentage = totalRevenue > 0 ? (totalFees / totalRevenue) * 100 : 0;
+  const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+  
+  // Calcular taxa de aprovação
+  const approvedTransactions = transactions.filter(tx => tx.status === 'paid' || tx.status === 'processing');
+  const approvalRate = totalTransactions > 0 ? (approvedTransactions.length / totalTransactions) * 100 : 0;
+  
+  // Calcular taxa de estorno
+  const refundedTransactions = transactions.filter(tx => tx.status === 'refunded');
+  const refundRate = totalTransactions > 0 ? (refundedTransactions.length / totalTransactions) * 100 : 0;
+  
+  // Receita de hoje
+  const today = new Date();
+  const todayRevenue = operations
+    .filter(op => isToday(op.created_at))
+    .reduce((sum, op) => sum + (op.amount || 0), 0);
+  
+  // Receita do mês
+  const monthRevenue = operations
+    .filter(op => isThisMonth(op.created_at))
+    .reduce((sum, op) => sum + (op.amount || 0), 0);
+  
+  // Valores pendentes e disponíveis
+  const pendingOperations = operations.filter(op => op.status === 'waiting_payment' || op.status === 'processing');
+  const pendingAmount = pendingOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
+  
+  const availableOperations = operations.filter(op => op.status === 'paid');
+  const availableAmount = availableOperations.reduce((sum, op) => sum + (op.amount || 0), 0);
   
   return {
     totalRevenue,
     totalFees,
     netRevenue,
-    totalOperations,
     totalTransactions,
-    pixOperations: pixOperations.length,
-    cardOperations: cardOperations.length,
-    pixRevenue,
-    cardRevenue,
-    avgTicket,
-    feePercentage,
+    averageTicket,
+    approvalRate,
+    refundRate,
     pixPercentage: totalRevenue > 0 ? (pixRevenue / totalRevenue) * 100 : 0,
-    cardPercentage: totalRevenue > 0 ? (cardRevenue / totalRevenue) * 100 : 0
+    creditCardPercentage: totalRevenue > 0 ? (cardRevenue / totalRevenue) * 100 : 0,
+    debitCardPercentage: totalRevenue > 0 ? (debitRevenue / totalRevenue) * 100 : 0,
+    boletoPercentage: totalRevenue > 0 ? (boletoRevenue / totalRevenue) * 100 : 0,
+    todayRevenue,
+    monthRevenue,
+    pendingAmount,
+    availableAmount
   };
 };
 

@@ -1,8 +1,11 @@
 
 import React from 'react';
-import { Bell, User, Search } from 'lucide-react';
+import { Bell, User, Search, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export const Header: React.FC = () => {
+  const { user, signOut } = useAuth();
+
   return (
     <header className="bg-[#1a1a1a] border-b border-gray-800 p-4">
       <div className="flex items-center justify-between">
@@ -37,10 +40,17 @@ export const Header: React.FC = () => {
             </div>
             {/* User info - Hidden on mobile */}
             <div className="text-sm hidden sm:block">
-              <p className="font-medium">João Silva</p>
-              <p className="text-gray-400">Admin</p>
+              <p className="font-medium">{user?.user_metadata?.full_name || user?.email}</p>
+              <p className="text-gray-400">Usuário</p>
             </div>
           </div>
+          
+          <button 
+            onClick={signOut}
+            className="p-2 rounded-xl hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </div>
     </header>

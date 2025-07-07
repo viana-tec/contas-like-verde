@@ -239,8 +239,11 @@ export const MovimentacoesPagarme = () => {
     try {
       console.log('🔄 [FRONTEND] Buscando dados...');
       
-      // Buscar payables com limite baixo para teste
-      const payablesData = await makeApiRequest('/core/v5/payables?count=20');
+      // Buscar todos os payables dos últimos 30 dias
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const dateParam = thirtyDaysAgo.toISOString().split('T')[0];
+      const payablesData = await makeApiRequest(`/core/v5/payables?count=1000&created_since=${dateParam}`);
       
       if (!payablesData || !payablesData.data) {
         throw new Error('Nenhum dado retornado da API');
@@ -251,15 +254,28 @@ export const MovimentacoesPagarme = () => {
         firstItem: payablesData.data?.[0] || null
       });
       
-      // Converter payables para operations - CORRIGINDO O ERRO DO SUBSTRING
+      // Converter payables para operations com dados expandidos
       const operationsFromPayables = (payablesData.data || []).map((payable: any, index: number) => ({
-        id: String(payable.id || `payable_${index}`), // Garantir que é string
+        id: String(payable.id || `payable_${index}`),
         type: payable.type || 'credit',
         status: payable.status || 'unknown',
         amount: Number(payable.amount) || 0,
         fee: Number(payable.fee) || 0,
         created_at: payable.created_at || new Date().toISOString(),
-        description: `${payable.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`
+        description: `${payable.payment_method || 'Pagamento'} - ${payable.type || 'Credit'}`,
+        // Dados expandidos do payable
+        payment_method: payable.payment_method || payable.transaction?.payment_method,
+        installments: payable.installments || payable.transaction?.installments,
+        acquirer_name: payable.acquirer_name || payable.transaction?.acquirer_name,
+        acquirer_response_code: payable.acquirer_response_code || payable.transaction?.acquirer_response_code,
+        authorization_code: payable.authorization_code || payable.transaction?.authorization_code,
+        tid: payable.tid || payable.transaction?.tid,
+        nsu: payable.nsu || payable.transaction?.nsu,
+        card_brand: payable.card_brand || payable.transaction?.card?.brand,
+        card_last_four_digits: payable.card_last_four_digits || payable.transaction?.card?.last_four_digits,
+        soft_descriptor: payable.soft_descriptor || payable.transaction?.soft_descriptor,
+        gateway_response_time: payable.gateway_response_time || payable.transaction?.gateway_response_time,
+        antifraud_score: payable.antifraud_score || payable.transaction?.antifraud_score
       }));
       
       setOperations(operationsFromPayables);

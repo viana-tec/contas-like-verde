@@ -39,26 +39,30 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
   };
 
   const formatCode = (operation: BalanceOperation) => {
-    // Extrair código de 5 dígitos se existir
-    const authCode = operation.authorization_code;
-    const tid = operation.tid;
-    const nsu = operation.nsu;
-    
-    if (authCode && authCode.length >= 5) {
-      return authCode.substring(0, 5);
-    }
-    if (tid && tid.length >= 5) {
-      return tid.substring(0, 5);
-    }
-    if (nsu && nsu.length >= 5) {
-      return nsu.substring(0, 5);
+    // Buscar código de autorização primeiro
+    if (operation.authorization_code) {
+      return operation.authorization_code.substring(0, 5);
     }
     
-    // Gerar código fictício baseado no ID se não houver
+    // Se não tem código de autorização, usar TID
+    if (operation.tid) {
+      return operation.tid.substring(0, 5);
+    }
+    
+    // Se não tem TID, usar NSU
+    if (operation.nsu) {
+      return operation.nsu.substring(0, 5);
+    }
+    
+    // Gerar código baseado no ID - pegar os 5 dígitos do meio/final
     const idStr = String(operation.id);
-    if (idStr.length >= 5) {
+    if (idStr.length >= 10) {
+      // Para ID como 8302223812, pegar dígitos do meio: posições 3-7
+      return idStr.substring(3, 8);
+    } else if (idStr.length >= 5) {
       return idStr.substring(idStr.length - 5);
     }
+    
     return '-----';
   };
 

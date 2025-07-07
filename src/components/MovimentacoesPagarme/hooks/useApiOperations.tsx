@@ -1,15 +1,8 @@
 
-/**
- * Hook para operações da API Pagar.me
- * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
- */
-
-import { useToast } from '@/hooks/use-toast';
-import { BalanceOperation, Transaction } from '../types';
-import { getMockOperations, getMockTransactions } from '../mockData';
-import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
-import { testConnection, fetchAllData } from '../services/pagarmeService';
 import { useState } from 'react';
+import { pagarmeService } from '../services/pagarmeService';
+import { dataCache } from '../services/dataCache';
+import { BalanceOperation, Transaction } from '../types';
 
 interface UseApiOperationsProps {
   apiKey: string;
@@ -18,8 +11,8 @@ interface UseApiOperationsProps {
   setAvailableBalance: (balance: number) => void;
   setPendingBalance: (balance: number) => void;
   setLoading: (loading: boolean) => void;
-  setConnectionStatus: (status: any) => void;
-  setErrorDetails: (details: string) => void;
+  setConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
+  setErrorDetails: (details: string | null) => void;
 }
 
 export const useApiOperations = ({
@@ -32,208 +25,172 @@ export const useApiOperations = ({
   setConnectionStatus,
   setErrorDetails
 }: UseApiOperationsProps) => {
-  const { toast } = useToast();
-  
-  // Estado para progresso detalhado
   const [progressInfo, setProgressInfo] = useState<{
-    stage: string;
     current: number;
     total: number;
-    info: string;
+    step: string;
   } | null>(null);
 
-  const saveApiKey = () => {
-    if (!apiKey.trim()) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira uma chave API.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateApiKey(apiKey)) {
-      toast({
-        title: "Formato inválido", 
-        description: "A chave da API deve ter pelo menos 10 caracteres válidos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    localStorage.setItem('pagarme_api_key', apiKey.trim());
-    setConnectionStatus('idle');
-    setErrorDetails('');
-    
-    toast({
-      title: "Chave API salva",
-      description: "A chave da API foi salva com sucesso.",
-    });
-  };
-
-  const handleTestConnection = async () => {
-    if (!apiKey?.trim()) {
-      toast({
-        title: "Erro",
-        description: "Configure sua chave da API primeiro.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateApiKey(apiKey)) {
-      toast({
-        title: "Formato inválido",
-        description: "Chave da API em formato inválido.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setConnectionStatus('connecting');
-    setErrorDetails('');
-    setProgressInfo({ stage: 'Testando conexão', current: 1, total: 2, info: 'Verificando API...' });
-    
+  const saveApiKey = async (key: string) => {
     try {
-      await testConnection(apiKey);
-      
-      setConnectionStatus('connected');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Conexão estabelecida",
-        description: "API Pagar.me conectada com sucesso!",
-      });
-      
-      // Buscar dados após conectar
-      await fetchData();
-      
-    } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro conexão:', error);
-      setConnectionStatus('error');
-      setErrorDetails(error.message || 'Erro desconhecido');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Erro de conexão",
-        description: error.message || 'Não foi possível conectar',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadDemoData = () => {
-    console.log('📊 [FRONTEND] Carregando demo...');
-    
-    try {
-      const mockOperations = getMockOperations();
-      const mockTransactions = getMockTransactions();
-
-      setOperations(mockOperations);
-      setTransactions(mockTransactions);
-      setAvailableBalance(125430.50);
-      setPendingBalance(45670.25);
-      setConnectionStatus('connected');
-      setErrorDetails('');
-
-      toast({
-        title: "Dados demo carregados",
-        description: `${mockOperations.length} operações e ${mockTransactions.length} transações.`,
-      });
+      localStorage.setItem('pagarme_api_key', key);
+      console.log('✅ Chave API salva com sucesso');
     } catch (error) {
-      console.error('❌ Erro ao carregar demo:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados demo",
-        variant: "destructive",
-      });
+      console.error('❌ Erro ao salvar chave API:', error);
     }
   };
 
-  const fetchData = async () => {
-    if (!apiKey?.trim() || !validateApiKey(apiKey)) {
-      toast({
-        title: "Erro",
-        description: "Chave API inválida.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    setErrorDetails('');
-    setProgressInfo({ stage: 'Iniciando coleta', current: 0, total: 4, info: 'Preparando...' });
+  const testConnection = async () => {
+    if (!apiKey) return;
     
-    try {
-      // Função de callback para atualizar progresso
-      const onProgress = (stage: string, current: number, total: number, info: string) => {
-        setProgressInfo({ stage, current, total, info });
-      };
+    setLoading(true);
+    setConnectionStatus('connecting');
+    setErrorDetails(null);
 
-      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey, onProgress);
-      
-      console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
-        ordersRaw: ordersData.length,
-        payablesRaw: payablesData.length,
-        transactionsRaw: transactionsData.length,
-        balance: balanceData
-      });
-      
-      setProgressInfo({ stage: 'Processando dados', current: 4, total: 4, info: 'Formatando operações...' });
-      
-      // Mapear orders para operações E payables para operações também 
-      const orderOperations = mapOrdersToOperations(ordersData);
-      const payableOperations = mapPayablesToOperations(payablesData);
-      
-      // Combinar todas as operações
-      const allOperations = [...orderOperations, ...payableOperations];
-      
-      // Converter transações
-      const formattedTransactions = mapTransactions(transactionsData);
-      
-      // Atualizar estados
-      setOperations(allOperations);
-      setTransactions(formattedTransactions);
-      setAvailableBalance(balanceData.available);
-      setPendingBalance(balanceData.pending);
-      
-      console.log(`🎯 [FRONTEND] DADOS PROCESSADOS COM SUCESSO:`, {
-        totalOperations: allOperations.length,
-        orderOperations: orderOperations.length,
-        payableOperations: payableOperations.length,
-        formattedTransactions: formattedTransactions.length,
-        saldoDisponivel: balanceData.available,
-        saldoPendente: balanceData.pending,
-        sampleOperation: allOperations[0],
-        sampleTransaction: formattedTransactions[0]
-      });
-      
-      setProgressInfo(null);
-      
-      toast({
-        title: "🎉 Dados carregados com sucesso!",
-        description: `${allOperations.length} operações e ${formattedTransactions.length} transações coletadas!`,
-      });
-      
-    } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro buscar dados:', error);
-      setErrorDetails(error.message || 'Erro ao buscar dados');
+    try {
+      const response = await pagarmeService.testConnection(apiKey);
+      if (response.success) {
+        setConnectionStatus('connected');
+        console.log('✅ Conexão testada com sucesso');
+      } else {
+        setConnectionStatus('error');
+        setErrorDetails(response.error || 'Erro desconhecido');
+      }
+    } catch (error) {
       setConnectionStatus('error');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Erro ao carregar",
-        description: error.message || 'Erro desconhecido',
-        variant: "destructive",
-      });
+      setErrorDetails(error instanceof Error ? error.message : 'Erro de conexão');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadDemoData = async () => {
+    setLoading(true);
+    setConnectionStatus('connecting');
+    
+    try {
+      const { mockOperations, mockTransactions } = await import('../mockData');
+      
+      setOperations(mockOperations);
+      setTransactions(mockTransactions);
+      setAvailableBalance(150000);
+      setPendingBalance(75000);
+      setConnectionStatus('connected');
+      
+      console.log('✅ Dados de demonstração carregados');
+    } catch (error) {
+      setConnectionStatus('error');
+      setErrorDetails('Erro ao carregar dados de demonstração');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchData = async (forceRefresh: boolean = false) => {
+    if (!apiKey) return;
+
+    setLoading(true);
+    setConnectionStatus('connecting');
+    setErrorDetails(null);
+    setProgressInfo(null);
+
+    try {
+      // Verificar cache primeiro (se não for refresh forçado)
+      const cacheKey = dataCache.generateKey(apiKey);
+      
+      if (!forceRefresh && dataCache.has(cacheKey)) {
+        const cachedData = dataCache.get(cacheKey);
+        if (cachedData) {
+          console.log('📦 Usando dados do cache');
+          setOperations(cachedData.operations || []);
+          setTransactions(cachedData.transactions || []);
+          setAvailableBalance(cachedData.availableBalance || 0);
+          setPendingBalance(cachedData.pendingBalance || 0);
+          setConnectionStatus('connected');
+          setLoading(false);
+          return;
+        }
+      }
+
+      console.log('🔄 Buscando dados da API Pagar.me...');
+      
+      setProgressInfo({
+        current: 1,
+        total: 4,
+        step: 'Buscando operações de saldo...'
+      });
+
+      const operationsResponse = await pagarmeService.getBalanceOperations(apiKey);
+      
+      if (!operationsResponse.success) {
+        throw new Error(operationsResponse.error || 'Erro ao buscar operações');
+      }
+
+      setProgressInfo({
+        current: 2,
+        total: 4,
+        step: 'Buscando transações...'
+      });
+
+      const transactionsResponse = await pagarmeService.getTransactions(apiKey);
+      
+      if (!transactionsResponse.success) {
+        throw new Error(transactionsResponse.error || 'Erro ao buscar transações');
+      }
+
+      setProgressInfo({
+        current: 3,
+        total: 4,
+        step: 'Buscando saldo...'
+      });
+
+      const balanceResponse = await pagarmeService.getBalance(apiKey);
+      
+      if (!balanceResponse.success) {
+        throw new Error(balanceResponse.error || 'Erro ao buscar saldo');
+      }
+
+      setProgressInfo({
+        current: 4,
+        total: 4,
+        step: 'Finalizando...'
+      });
+
+      const operations = operationsResponse.data || [];
+      const transactions = transactionsResponse.data || [];
+      const balance = balanceResponse.data;
+
+      // Armazenar no cache
+      const dataToCache = {
+        operations,
+        transactions,
+        availableBalance: balance?.available?.amount || 0,
+        pendingBalance: balance?.waiting_funds?.amount || 0
+      };
+
+      dataCache.set(cacheKey, dataToCache, 30 * 60 * 1000); // 30 minutos
+
+      setOperations(operations);
+      setTransactions(transactions);
+      setAvailableBalance(balance?.available?.amount || 0);
+      setPendingBalance(balance?.waiting_funds?.amount || 0);
+      setConnectionStatus('connected');
+      
+      console.log(`✅ Dados carregados: ${operations.length} operações, ${transactions.length} transações`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados:', error);
+      setConnectionStatus('error');
+      setErrorDetails(error instanceof Error ? error.message : 'Erro desconhecido');
+    } finally {
+      setLoading(false);
+      setProgressInfo(null);
+    }
+  };
+
   return {
     saveApiKey,
-    testConnection: handleTestConnection,
+    testConnection,
     loadDemoData,
     fetchData,
     progressInfo

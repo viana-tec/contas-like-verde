@@ -13,42 +13,37 @@ export const validateApiKey = (key: string): boolean => {
   return cleanKey.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(cleanKey);
 };
 
-// Função OTIMIZADA para extrair código real da transação/pedido
+// Função OTIMIZADA para extrair código numérico real da transação/pedido
 export const extractRealTransactionCode = (item: any): string => {
-  // Hierarquia otimizada para códigos mais legíveis
-  if (item.code && typeof item.code === 'string' && item.code.length >= 4) {
-    return item.code;
+  // PRIORIDADE 1: Código do pedido/order (como 45812, 45811)
+  if (item.code && typeof item.code === 'string') {
+    // Se for numérico, usar direto
+    if (/^\d+$/.test(item.code)) {
+      return item.code;
+    }
   }
   
-  if (item.reference_key && item.reference_key.length >= 6) {
+  // PRIORIDADE 2: Reference key numérico
+  if (item.reference_key && /^\d+$/.test(item.reference_key)) {
     return item.reference_key;
   }
   
-  if (item.authorization_code && item.authorization_code.length >= 6) {
-    return item.authorization_code;
-  }
-  
-  if (item.tid && item.tid.length >= 6) {
-    return item.tid;
-  }
-  
-  if (item.nsu && item.nsu.length >= 6) {
-    return item.nsu;
-  }
-  
-  if (item.gateway_id && String(item.gateway_id).length >= 6) {
+  // PRIORIDADE 3: Gateway ID se for numérico
+  if (item.gateway_id && /^\d+$/.test(String(item.gateway_id))) {
     return String(item.gateway_id);
   }
   
-  // Fallback com padrão mais legível
+  // PRIORIDADE 4: Extrair números do ID (para ch_XXXXX extrair parte numérica)
   const idStr = String(item.id || '');
   const numericPart = idStr.replace(/[^0-9]/g, '');
   
-  if (numericPart.length >= 6) {
-    return numericPart.substring(0, 8);
+  if (numericPart.length >= 4) {
+    return numericPart.substring(0, 6);
   }
   
-  return `TX${Math.floor(Math.random() * 999999).toString().padStart(6, '0')}`;
+  // Fallback: gerar código sequencial baseado no timestamp
+  const timestamp = Date.now();
+  return String(timestamp).slice(-5);
 };
 
 // Função para extrair TODOS os dados detalhados de uma transação/operação
@@ -118,7 +113,7 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
       amount: (Number(order.amount) || 0) / 100,
       fee: (Number(charge.fee) || Number(charge.transaction?.fee) || 0) / 100,
       created_at: order.created_at || new Date().toISOString(),
-      description: `Pedido ${order.code || order.id} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
+      description: `Pedido ${order.code || extractRealTransactionCode(order)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       
       // Dados COMPLETOS extraídos
       ...detailedData,

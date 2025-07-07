@@ -106,13 +106,24 @@ export const calculateFinancialIndicators = (
   operations: BalanceOperation[], 
   transactions: Transaction[]
 ): FinancialIndicators => {
+  console.log('🔍 [INDICADORES] Calculando:', {
+    totalOperations: operations.length,
+    totalTransactions: transactions.length,
+    sampleOperation: operations[0],
+    sampleTransaction: transactions[0]
+  });
+  
   const totalTransactions = transactions.length;
   
   // CORREÇÃO: Considerar apenas transações PAGAS para receita total
   const paidTransactions = transactions.filter(tx => tx.status === 'paid');
+  console.log('💰 [INDICADORES] Transações pagas:', paidTransactions.length);
+  
   const totalRevenue = paidTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
   const totalFees = paidTransactions.reduce((sum, tx) => sum + (tx.fee || 0), 0);
   const netRevenue = totalRevenue - totalFees;
+  
+  console.log('💰 [INDICADORES] Receitas:', { totalRevenue, totalFees, netRevenue });
   
   // CORREÇÃO: Considerar apenas transações PAGAS para cálculos por método
   const pixTransactions = paidTransactions.filter(tx => tx.payment_method === 'pix');

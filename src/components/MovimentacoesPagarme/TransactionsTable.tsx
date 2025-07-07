@@ -51,7 +51,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactio
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-gray-300">ID</TableHead>
+                 <TableHead className="text-gray-300">ID Transação</TableHead>
+                 <TableHead className="text-gray-300">Código</TableHead>
                 <TableHead className="text-gray-300">Método</TableHead>
                 <TableHead className="text-gray-300">Valor</TableHead>
                 <TableHead className="text-gray-300">Status</TableHead>
@@ -60,11 +61,17 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactio
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="text-gray-300 font-mono text-xs">
-                    {transaction.id.substring(0, 12)}...
-                  </TableCell>
+               {currentTransactions.map((transaction) => (
+                 <TableRow key={transaction.id}>
+                   <TableCell className="text-gray-300 font-mono text-xs">
+                     {transaction.id.substring(0, 15)}...
+                   </TableCell>
+                   <TableCell className="text-green-400 font-mono font-bold">
+                     {(transaction as any).real_code || 
+                      String(transaction.id).replace(/[^0-9]/g, '').substring(0, 6) ||
+                      String(Date.now()).slice(-5)
+                     }
+                   </TableCell>
                   <TableCell className="text-gray-300">
                     <div className="flex items-center gap-2">
                       <PaymentMethodIcon method={transaction.payment_method} />

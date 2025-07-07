@@ -58,30 +58,35 @@ export const OperationsTable: React.FC<OperationsTableProps> = ({ operations }) 
   };
 
   const formatCode = (operation: BalanceOperation) => {
+    // PRIORIDADE 1: real_code que já foi processado
     if ((operation as any).real_code) {
       return (operation as any).real_code;
     }
     
-    if (operation.authorization_code && operation.authorization_code.length >= 5) {
-      return operation.authorization_code.substring(0, 8);
-    }
-    
-    if (operation.tid && operation.tid.length >= 5) {
-      return operation.tid.substring(0, 8);
-    }
-    
-    if (operation.nsu && operation.nsu.length >= 5) {
-      return operation.nsu.substring(0, 8);
-    }
-    
+    // PRIORIDADE 2: Extrair números do ID da transação (para ch_XXXXX pegar parte numérica)
     const idStr = String(operation.id);
     const numericPart = idStr.replace(/[^0-9]/g, '');
     
     if (numericPart.length >= 4) {
-      return `4${numericPart.slice(-4)}`;
+      return numericPart.substring(0, 6);
     }
     
-    return `4${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+    // PRIORIDADE 3: Códigos de autorização se existirem
+    if (operation.authorization_code && /^\d+$/.test(operation.authorization_code)) {
+      return operation.authorization_code.substring(0, 6);
+    }
+    
+    if (operation.tid && /^\d+$/.test(operation.tid)) {
+      return operation.tid.substring(0, 6);
+    }
+    
+    if (operation.nsu && /^\d+$/.test(operation.nsu)) {
+      return operation.nsu.substring(0, 6);
+    }
+    
+    // Fallback: usar timestamp
+    const timestamp = Date.now();
+    return String(timestamp).slice(-5);
   };
 
   return (

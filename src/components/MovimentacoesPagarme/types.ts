@@ -34,6 +34,7 @@ export interface Transaction {
   payment_method: string;
   created_at: string;
   paid_at?: string;
+  fee?: number; // Adicionado campo fee
   // Campos expandidos
   installments?: number;
   acquirer_name?: string;

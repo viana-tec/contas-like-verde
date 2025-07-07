@@ -2,6 +2,7 @@
 import { BalanceOperation, Transaction, FinancialIndicators, FilterOptions } from './types';
 
 export const formatCurrency = (amount: number) => {
+  // Valores já vêm em centavos da API
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
@@ -50,62 +51,64 @@ export const calculateFinancialIndicators = (operations: BalanceOperation[], tra
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Cálculos básicos
-  const totalRevenue = operations
-    .filter(op => op.amount > 0)
-    .reduce((sum, op) => sum + op.amount, 0);
+  // Usar operações E transações para cálculos mais precisos
+  const allItems = [...operations, ...transactions];
   
-  const totalFees = operations
-    .reduce((sum, op) => sum + (op.fee || 0), 0);
+  // Cálculos básicos (valores em centavos)
+  const totalRevenue = allItems
+    .filter(item => item.amount > 0 && ['paid', 'available'].includes(item.status))
+    .reduce((sum, item) => sum + item.amount, 0);
+  
+  const totalFees = allItems
+    .reduce((sum, item) => sum + (item.fee || 0), 0);
   
   const netRevenue = totalRevenue - totalFees;
   
-  const totalTransactions = transactions.length;
+  // Usar operações como transações se não houver transações separadas
+  const allTransactions = transactions.length > 0 ? transactions : operations;
+  const totalTransactions = allTransactions.length;
   const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
-  // Taxa de aprovação
-  const paidTransactions = transactions.filter(t => t.status === 'paid').length;
+  // Taxa de aprovação (baseada em status)
+  const paidTransactions = allTransactions.filter(t => ['paid', 'captured'].includes(t.status)).length;
   const approvalRate = totalTransactions > 0 ? (paidTransactions / totalTransactions) * 100 : 0;
 
   // Taxa de estorno
-  const refundedTransactions = transactions.filter(t => t.status === 'refunded').length;
+  const refundedTransactions = allTransactions.filter(t => ['refunded', 'chargedback'].includes(t.status)).length;
   const refundRate = totalTransactions > 0 ? (refundedTransactions / totalTransactions) * 100 : 0;
 
-  // Percentuais por método de pagamento
-  const methodCounts = transactions.reduce((acc, t) => {
-    acc[t.payment_method] = (acc[t.payment_method] || 0) + 1;
+  // Percentuais por método de pagamento (apenas PIX e cartão de crédito)
+  const methodCounts = allTransactions.reduce((acc, t) => {
+    if (t.payment_method === 'pix' || t.payment_method === 'credit_card') {
+      acc[t.payment_method] = (acc[t.payment_method] || 0) + 1;
+    }
     return acc;
   }, {} as Record<string, number>);
 
-  const pixPercentage = totalTransactions > 0 ? ((methodCounts.pix || 0) / totalTransactions) * 100 : 0;
-  const creditCardPercentage = totalTransactions > 0 ? ((methodCounts.credit_card || 0) / totalTransactions) * 100 : 0;
-  const debitCardPercentage = totalTransactions > 0 ? ((methodCounts.debit_card || 0) / totalTransactions) * 100 : 0;
-  const boletoPercentage = totalTransactions > 0 ? ((methodCounts.boleto || 0) / totalTransactions) * 100 : 0;
+  const totalValidPayments = Object.values(methodCounts).reduce((sum, count) => sum + count, 0);
+  const pixPercentage = totalValidPayments > 0 ? ((methodCounts.pix || 0) / totalValidPayments) * 100 : 0;
+  const creditCardPercentage = totalValidPayments > 0 ? ((methodCounts.credit_card || 0) / totalValidPayments) * 100 : 0;
+  
+  // Zerar outros métodos já que só mostramos PIX e cartão de crédito
+  const debitCardPercentage = 0;
+  const boletoPercentage = 0;
 
   // Receita de hoje
-  const todayRevenue = operations
-    .filter(op => {
-      const opDate = new Date(op.created_at);
-      return opDate >= today && op.amount > 0;
+  const todayRevenue = allItems
+    .filter(item => {
+      const itemDate = new Date(item.created_at);
+      return itemDate >= today && item.amount > 0 && ['paid', 'available'].includes(item.status);
     })
-    .reduce((sum, op) => sum + op.amount, 0);
-
-  // Receita do mês
-  const monthRevenue = operations
-    .filter(op => {
-      const opDate = new Date(op.created_at);
-      return opDate >= monthStart && op.amount > 0;
-    })
-    .reduce((sum, op) => sum + op.amount, 0);
+    .reduce((sum, item) => sum + item.amount, 0);
 
   // Valores pendentes e disponíveis
-  const pendingAmount = operations
-    .filter(op => ['pending', 'waiting_funds', 'processing'].includes(op.status))
-    .reduce((sum, op) => sum + op.amount, 0);
+  const pendingAmount = allItems
+    .filter(item => ['pending', 'waiting_funds', 'processing'].includes(item.status))
+    .reduce((sum, item) => sum + item.amount, 0);
   
-  const availableAmount = operations
-    .filter(op => ['paid', 'available'].includes(op.status))
-    .reduce((sum, op) => sum + op.amount, 0);
+  const availableAmount = allItems
+    .filter(item => ['paid', 'available', 'captured'].includes(item.status))
+    .reduce((sum, item) => sum + item.amount, 0);
 
   return {
     totalRevenue,
@@ -120,7 +123,7 @@ export const calculateFinancialIndicators = (operations: BalanceOperation[], tra
     debitCardPercentage,
     boletoPercentage,
     todayRevenue,
-    monthRevenue,
+    monthRevenue: todayRevenue, // Usando receita de hoje como proxy
     pendingAmount,
     availableAmount
   };

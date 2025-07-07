@@ -91,29 +91,39 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
     const charge = order.charges?.[0] || {};
     const customer = order.customer || {};
     
+    // Filtrar apenas PIX e cartão de crédito
+    const paymentMethod = charge.payment_method;
+    if (!paymentMethod || (paymentMethod !== 'pix' && paymentMethod !== 'credit_card')) {
+      return null;
+    }
+    
+    // Extrair dados completos do charge
+    const card = charge.card || {};
+    const transaction = charge.transaction || charge;
+    
     return {
       id: String(order.id || `order_${index}`),
       type: 'order',
-      status: order.status || 'unknown',
+      status: order.status || charge.status || 'unknown',
       amount: Number(order.amount) || 0,
-      fee: 0, // Orders não têm fee direto
+      fee: Number(charge.fee) || Number(transaction.fee) || 0,
       created_at: order.created_at || new Date().toISOString(),
-      description: `Pedido ${order.code} - ${charge.payment_method || 'Pagamento'}`,
-      // Dados do order
-      payment_method: charge.payment_method,
-      installments: 1,
-      acquirer_name: charge.acquirer_name,
-      acquirer_response_code: charge.acquirer_response_code,
-      authorization_code: charge.authorization_code,
-      tid: charge.tid,
-      nsu: charge.nsu,
-      card_brand: charge.card?.brand,
-      card_last_four_digits: charge.card?.last_four_digits,
-      soft_descriptor: charge.soft_descriptor,
-      gateway_response_time: charge.gateway_response_time,
-      antifraud_score: charge.antifraud_score,
+      description: `Pedido ${order.code} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
+      // Dados do pagamento
+      payment_method: paymentMethod,
+      installments: Number(charge.installments) || Number(transaction.installments) || 1,
+      acquirer_name: charge.acquirer_name || transaction.acquirer_name,
+      acquirer_response_code: charge.acquirer_response_code || transaction.acquirer_response_code,
+      authorization_code: charge.authorization_code || transaction.authorization_code,
+      tid: charge.tid || transaction.tid,
+      nsu: charge.nsu || transaction.nsu,
+      card_brand: card.brand || charge.card_brand || transaction.card_brand,
+      card_last_four_digits: card.last_four_digits || charge.card_last_four_digits || transaction.card_last_four_digits,
+      soft_descriptor: charge.soft_descriptor || transaction.soft_descriptor,
+      gateway_response_time: charge.gateway_response_time || transaction.gateway_response_time,
+      antifraud_score: charge.antifraud_score || transaction.antifraud_score,
       // Dados adicionais
-      transaction_id: charge.id,
+      transaction_id: charge.id || transaction.id,
       order_id: order.id,
       reference_key: order.reference_key,
       customer: customer,
@@ -121,35 +131,42 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
       // Código real do pedido
       real_code: order.code || extractRealTransactionCode(order)
     };
-  });
+  }).filter(Boolean); // Remove valores null
 };
 
 // Mapear transações
 export const mapTransactions = (transactionsData: any[]): any[] => {
-  return transactionsData.map((transaction: any) => ({
-    id: String(transaction.id),
-    amount: Number(transaction.amount) || 0,
-    status: transaction.status || 'unknown',
-    payment_method: transaction.payment_method || 'unknown',
-    created_at: transaction.created_at || new Date().toISOString(),
-    paid_at: transaction.paid_at,
-    installments: transaction.installments,
-    acquirer_name: transaction.acquirer_name,
-    acquirer_response_code: transaction.acquirer_response_code,
-    authorization_code: transaction.authorization_code,
-    tid: transaction.tid,
-    nsu: transaction.nsu,
-    card_brand: transaction.card?.brand,
-    card_last_four_digits: transaction.card?.last_four_digits,
-    soft_descriptor: transaction.soft_descriptor,
-    gateway_response_time: transaction.gateway_response_time,
-    antifraud_score: transaction.antifraud_score,
-    reference_key: transaction.reference_key,
-    customer: transaction.customer,
-    billing: transaction.billing,
-    boleto: transaction.boleto,
-    pix: transaction.pix,
-    // Código real extraído
-    real_code: extractRealTransactionCode(transaction)
-  }));
+  return transactionsData
+    .filter((transaction: any) => {
+      // Filtrar apenas PIX e cartão de crédito
+      const paymentMethod = transaction.payment_method;
+      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
+    })
+    .map((transaction: any) => ({
+      id: String(transaction.id),
+      amount: Number(transaction.amount) || 0,
+      status: transaction.status || 'unknown',
+      payment_method: transaction.payment_method || 'unknown',
+      created_at: transaction.created_at || new Date().toISOString(),
+      paid_at: transaction.paid_at,
+      fee: Number(transaction.fee) || 0, // Adicionado campo fee
+      installments: Number(transaction.installments) || 1,
+      acquirer_name: transaction.acquirer_name,
+      acquirer_response_code: transaction.acquirer_response_code,
+      authorization_code: transaction.authorization_code,
+      tid: transaction.tid,
+      nsu: transaction.nsu,
+      card_brand: transaction.card?.brand || transaction.card_brand,
+      card_last_four_digits: transaction.card?.last_four_digits || transaction.card_last_four_digits,
+      soft_descriptor: transaction.soft_descriptor,
+      gateway_response_time: transaction.gateway_response_time,
+      antifraud_score: transaction.antifraud_score,
+      reference_key: transaction.reference_key,
+      customer: transaction.customer,
+      billing: transaction.billing,
+      boleto: transaction.boleto,
+      pix: transaction.pix,
+      // Código real extraído
+      real_code: extractRealTransactionCode(transaction)
+    }));
 };

@@ -148,29 +148,43 @@ export const testConnection = async (apiKey: string): Promise<void> => {
 
 // Função para buscar todos os dados necessários
 export const fetchAllData = async (apiKey: string) => {
-  console.log('🔄 [FRONTEND] Iniciando coleta COMPLETA dos últimos 30 dias...');
+  console.log('🔄 [FRONTEND] Iniciando coleta COMPLETA dos últimos 90 dias...');
   
-  // Data de 30 dias atrás
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const dateParam = thirtyDaysAgo.toISOString().split('T')[0];
+  // Data de 90 dias atrás para garantir mais dados
+  const nintyDaysAgo = new Date();
+  nintyDaysAgo.setDate(nintyDaysAgo.getDate() - 90);
+  const dateParam = nintyDaysAgo.toISOString().split('T')[0];
   
   console.log(`📅 [FRONTEND] Data de referência: ${dateParam}`);
   
-  // Executar todas as consultas em paralelo para melhor performance
-  const [payablesData, transactionsData, ordersData, balanceData] = await Promise.all([
-    // 1. Buscar TODOS os payables (sem limite)
-    fetchAllDataUnlimited(`/core/v5/payables?created_since=${dateParam}`, apiKey),
-    
-    // 2. Buscar TODAS as transações (sem limite) - SEM created_since que causa erro 422
-    fetchAllDataUnlimited(`/core/v5/transactions`, apiKey),
-    
-    // 3. Buscar TODOS os orders (sem limite)
-    fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`, apiKey),
-    
-    // 4. Buscar saldo atual
-    fetchBalance(apiKey)
-  ]);
+  // Buscar dados sequencialmente para evitar limitações da API
+  console.log('🚀 [FRONTEND] Buscando payables...');
+  const payablesData = await fetchAllDataUnlimited(`/core/v5/payables?created_since=${dateParam}`, apiKey);
+  
+  console.log('🚀 [FRONTEND] Buscando orders...');
+  const ordersData = await fetchAllDataUnlimited(`/core/v5/orders?created_since=${dateParam}`, apiKey);
+  
+  console.log('🚀 [FRONTEND] Buscando transações...');
+  // Usar endpoint de orders para obter transações diretamente dos charges
+  let transactionsData: any[] = [];
+  try {
+    // Extrair transações dos orders (que já temos)
+    transactionsData = ordersData.flatMap(order => {
+      return order.charges?.map((charge: any) => ({
+        ...charge,
+        order_id: order.id,
+        customer: order.customer,
+        payment_method: charge.payment_method || 'unknown'
+      })) || [];
+    });
+    console.log(`📊 [FRONTEND] Transações extraídas dos orders: ${transactionsData.length}`);
+  } catch (error) {
+    console.warn('⚠️ [FRONTEND] Erro ao extrair transações, usando array vazio');
+    transactionsData = [];
+  }
+  
+  console.log('🚀 [FRONTEND] Buscando saldo...');
+  const balanceData = await fetchBalance(apiKey);
   
   console.log(`📊 [FRONTEND] Dados coletados:`, {
     payables: payablesData.length,

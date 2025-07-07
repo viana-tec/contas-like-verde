@@ -167,31 +167,6 @@ export const FinancialIndicators: React.FC<FinancialIndicatorsProps> = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300 text-sm">Cartão de Débito</span>
-                <Badge variant="secondary" className="bg-purple-900/30 text-purple-400">
-                  {indicators.debitCardPercentage.toFixed(1)}%
-                </Badge>
-              </div>
-              <Progress 
-                value={indicators.debitCardPercentage} 
-                className="h-2"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300 text-sm">Boleto</span>
-                <Badge variant="secondary" className="bg-orange-900/30 text-orange-400">
-                  {indicators.boletoPercentage.toFixed(1)}%
-                </Badge>
-              </div>
-              <Progress 
-                value={indicators.boletoPercentage} 
-                className="h-2"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>

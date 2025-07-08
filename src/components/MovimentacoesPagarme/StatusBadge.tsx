@@ -7,9 +7,6 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  // Log para debug - verificar que status está chegando
-  console.log('🔍 [STATUS_BADGE] Status recebido:', status);
-  
   const statusMap: Record<string, { label: string; variant: any }> = {
     paid: { label: 'Pago', variant: 'default' },
     captured: { label: 'Pago', variant: 'default' },
@@ -28,9 +25,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   };
 
   const statusInfo = statusMap[status] || { label: status, variant: 'outline' };
-  
-  // Log para debug - verificar mapeamento
-  console.log('🔍 [STATUS_BADGE] Mapeamento:', { status, statusInfo });
   
   return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
 };

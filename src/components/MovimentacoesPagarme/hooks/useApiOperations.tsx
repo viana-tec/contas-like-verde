@@ -4,9 +4,9 @@
  */
 
 import { useToast } from '@/hooks/use-toast';
-import { BalanceOperation, Transaction } from '../types';
-import { getMockOperations, getMockTransactions } from '../mockData';
-import { validateApiKey, mapChargesToOperations, mapTransactions } from '../utils/pagarmeUtils';
+import { BalanceOperation } from '../types';
+import { getMockOperations } from '../mockData';
+import { validateApiKey, mapChargesToOperations } from '../utils/pagarmeUtils';
 import { testConnection, fetchAllDataWithBalance } from '../services/pagarmeService';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
@@ -14,7 +14,6 @@ import { useState } from 'react';
 interface UseApiOperationsProps {
   apiKey: string;
   setOperations: (operations: BalanceOperation[]) => void;
-  setTransactions: (transactions: Transaction[]) => void;
   setAvailableBalance: (balance: number) => void;
   setPendingBalance: (balance: number) => void;
   setLoading: (loading: boolean) => void;
@@ -25,7 +24,6 @@ interface UseApiOperationsProps {
 export const useApiOperations = ({
   apiKey,
   setOperations,
-  setTransactions,
   setAvailableBalance,
   setPendingBalance,
   setLoading,
@@ -43,7 +41,7 @@ export const useApiOperations = ({
   } | null>(null);
 
   // Função para salvar dados no Supabase
-  const saveDataToSupabase = async (operations: BalanceOperation[], transactions: Transaction[]) => {
+  const saveDataToSupabase = async (operations: BalanceOperation[]) => {
     try {
       console.log('💾 [SUPABASE] Salvando dados no banco...');
       
@@ -102,7 +100,7 @@ export const useApiOperations = ({
 
       if (error) {
         console.error('❌ [SUPABASE] Erro ao carregar operações:', error);
-        return { operations: [], transactions: [] };
+        return { operations: [] };
       }
 
       // Converter dados do Supabase para BalanceOperation
@@ -128,12 +126,11 @@ export const useApiOperations = ({
       console.log(`📥 [SUPABASE] ${formattedOperations.length} operações carregadas`);
       
       return {
-        operations: formattedOperations,
-        transactions: [] // Por enquanto só operações
+        operations: formattedOperations
       };
     } catch (error) {
       console.error('❌ [SUPABASE] Erro ao carregar dados:', error);
-      return { operations: [], transactions: [] };
+      return { operations: [] };
     }
   };
 
@@ -222,10 +219,9 @@ export const useApiOperations = ({
     
     try {
       const mockOperations = getMockOperations();
-      const mockTransactions = getMockTransactions();
 
       setOperations(mockOperations);
-      setTransactions(mockTransactions);
+      
       setAvailableBalance(125430.50);
       setPendingBalance(45670.25);
       setConnectionStatus('connected');
@@ -233,7 +229,7 @@ export const useApiOperations = ({
 
       toast({
         title: "Dados demo carregados",
-        description: `${mockOperations.length} operações e ${mockTransactions.length} transações.`,
+        description: `${mockOperations.length} operações carregadas.`,
       });
     } catch (error) {
       console.error('❌ Erro ao carregar demo:', error);
@@ -251,7 +247,6 @@ export const useApiOperations = ({
       const savedData = await loadDataFromSupabase();
       if (savedData.operations.length > 0) {
         setOperations(savedData.operations);
-        setTransactions(savedData.transactions);
         setConnectionStatus('connected');
         setErrorDetails('');
         
@@ -297,27 +292,23 @@ export const useApiOperations = ({
       // Usar apenas operações de charges
       const allOperations = chargeOperations;
       
-      // Converter transações
-      const formattedTransactions = mapTransactions(transactionsData);
-      
       // Salvar dados no Supabase
       setProgressInfo({ stage: 'Salvando dados', current: 5, total: 5, info: 'Persistindo no banco...' });
-      await saveDataToSupabase(allOperations, formattedTransactions);
+      await saveDataToSupabase(allOperations);
       
       // Atualizar estados
       setOperations(allOperations);
-      setTransactions(formattedTransactions);
+      
       setAvailableBalance(balanceData.available);
       setPendingBalance(balanceData.pending);
       
       console.log(`🎯 [FRONTEND] DADOS PROCESSADOS E SALVOS COM SUCESSO:`, {
         totalOperations: allOperations.length,
         chargeOperations: chargeOperations.length,
-        formattedTransactions: formattedTransactions.length,
+        
         saldoDisponivel: balanceData.available,
         saldoPendente: balanceData.pending,
-        sampleOperation: allOperations[0],
-        sampleTransaction: formattedTransactions[0]
+        sampleOperation: allOperations[0]
       });
       
       setProgressInfo(null);
@@ -334,7 +325,6 @@ export const useApiOperations = ({
       const savedData = await loadDataFromSupabase();
       if (savedData.operations.length > 0) {
         setOperations(savedData.operations);
-        setTransactions(savedData.transactions);
         setConnectionStatus('connected');
         setErrorDetails(`Erro na API: ${error.message}, exibindo dados salvos`);
         
@@ -365,7 +355,7 @@ export const useApiOperations = ({
     const savedData = await loadDataFromSupabase();
     if (savedData.operations.length > 0) {
       setOperations(savedData.operations);
-      setTransactions(savedData.transactions);
+      
       
       toast({
         title: "Dados restaurados",

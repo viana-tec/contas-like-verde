@@ -15,7 +15,7 @@ export const fetchAllDataUnlimited = async (
   let allData: any[] = [];
   let page = 1;
   let pageSize = 100; // API v5 usa 'size' e max 100
-  let maxPages = 2000; // Aumentar limite para coleta completa de transações
+  let maxPages = 5000; // Aumentar limite para coleta completa de charges
   let consecutiveEmptyPages = 0;
   const maxConsecutiveEmpty = 3;
   
@@ -90,100 +90,53 @@ export const fetchAllDataUnlimited = async (
   return allData;
 };
 
-// Função MASSIVA para buscar TODOS os dados de MÚLTIPLOS endpoints - VERSÃO DEFINITIVA
+// Função MASSIVA para buscar TODAS as charges (ch_) - VERSÃO FOCADA
 export const fetchAllData = async (
   apiKey: string, 
   onProgress?: (stage: string, current: number, total: number, info: string) => void
 ) => {
-  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA ILIMITADA DEFINITIVA...');
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE CHARGES (ch_)...');
   
-  // Período estendido de 12 meses para capturar TODOS os dados históricos
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const dateParam = twelveMonthsAgo.toISOString().split('T')[0];
+  // Período estendido de 24 meses para capturar TODOS os dados históricos
+  const twentyFourMonthsAgo = new Date();
+  twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+  const dateParam = twentyFourMonthsAgo.toISOString().split('T')[0];
   
-  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (12 meses)`);
+  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (24 meses)`);
   
   try {
-    // FASE 1: Coleta PARALELA OTIMIZADA focada em charges e transactions
-    console.log('🚀 [FASE 1] Iniciando coleta paralela otimizada (charges + transactions)...');
-    onProgress?.('Coletando dados', 1, 3, 'Iniciando coleta de charges e transactions...');
+    // FASE 1: Coleta MASSIVA focada SOMENTE em charges
+    console.log('🚀 [FASE 1] Iniciando coleta massiva de charges...');
+    onProgress?.('Coletando charges', 1, 2, 'Iniciando coleta de todas as charges...');
     
-    const endpoints = [
-      { name: 'charges', url: `/core/v5/charges?created_since=${dateParam}` },
-      { name: 'transactions', url: `/core/v5/transactions?created_since=${dateParam}` }
-    ];
-    
-    const results = await Promise.allSettled(
-      endpoints.map(async (ep, index) => {
-        onProgress?.('Coletando dados', index + 1, 3, `Coletando ${ep.name}...`);
-        const data = await fetchAllDataUnlimited(ep.url, apiKey, (current, total, info) => {
-          onProgress?.('Coletando dados', index + 1, 3, `${ep.name}: ${info}`);
-        });
-        return { name: ep.name, data };
-      })
-    );
-    
-    // Processar resultados
-    const chargesData = results[0].status === 'fulfilled' ? results[0].value.data : [];
-    const transactionsData = results[1].status === 'fulfilled' ? results[1].value.data : [];
-    
-    console.log(`📊 [FASE 1] Coleta completa:`, {
-      charges: chargesData.length,
-      transactions: transactionsData.length
+    const chargesEndpoint = `/core/v5/charges?created_since=${dateParam}`;
+    const chargesData = await fetchAllDataUnlimited(chargesEndpoint, apiKey, (current, total, info) => {
+      onProgress?.('Coletando charges', 1, 2, `Charges: ${info}`);
     });
     
-    // FASE 2: Processamento de charges para transações
-    console.log('🚀 [FASE 2] Processando transações dos charges...');
-    onProgress?.('Processando dados', 2, 3, 'Extraindo transações dos charges...');
+    console.log(`📊 [FASE 1] Coleta de charges completa: ${chargesData.length} charges`);
     
-    let chargeTransactionsData: any[] = [];
-    try {
-      chargeTransactionsData = chargesData.map(charge => ({
-        ...charge,
-        charge_id: charge.id,
-        payment_method: charge.payment_method || 'unknown',
-        source: 'charge_transactions'
-      }));
-      console.log(`📊 [FASE 2] Transações dos charges: ${chargeTransactionsData.length}`);
-    } catch (error) {
-      console.warn('⚠️ [FASE 2] Erro ao processar charges:', error);
-    }
+    // FASE 2: Filtrar somente charges que começam com 'ch_'
+    console.log('🚀 [FASE 2] Filtrando charges válidas (ch_)...');
+    onProgress?.('Processando dados', 2, 2, 'Filtrando charges válidas...');
     
-    // FASE 3: Consolidação final
-    console.log('🚀 [FASE 3] Consolidando dados...');
-    onProgress?.('Consolidando', 3, 3, 'Finalizando processamento...');
-    
-    const allTransactionsData = [
-      ...transactionsData.map(t => ({ ...t, source: 'direct_transactions' })),
-      ...chargesData.map(c => ({ ...c, source: 'direct_charges' })),
-      ...chargeTransactionsData
-    ];
-    
-    // Remover duplicatas por ID
-    const uniqueTransactions = allTransactionsData.reduce((acc: any[], transaction: any) => {
-      const exists = acc.find(t => t.id === transaction.id);
-      if (!exists) {
-        acc.push(transaction);
-      }
-      return acc;
-    }, []);
+    const validCharges = chargesData.filter(charge => 
+      charge.id && charge.id.startsWith('ch_')
+    );
     
     const finalStats = {
-      charges: chargesData.length,
-      directTransactions: transactionsData.length,
-      chargeTransactions: chargeTransactionsData.length,
-      uniqueTransactions: uniqueTransactions.length,
-      totalOperations: chargesData.length + transactionsData.length
+      totalCharges: chargesData.length,
+      validCharges: validCharges.length,
+      filtered: chargesData.length - validCharges.length
     };
     
-    console.log(`🎯 [MASTER] COLETA DEFINITIVA FINALIZADA:`, finalStats);
-    onProgress?.('Concluído', 3, 3, `${finalStats.totalOperations} operações coletadas!`);
+    console.log(`🎯 [MASTER] COLETA FINALIZADA:`, finalStats);
+    onProgress?.('Concluído', 2, 2, `${finalStats.validCharges} charges válidas coletadas!`);
 
     return {
-      payablesData: chargesData, // Na v5, charges substituem payables
-      transactionsData: uniqueTransactions,
-      ordersData: [] // Removido orders da coleta
+      payablesData: validCharges, // Somente charges válidas
+      transactionsData: [], // Removido transações
+      ordersData: [] // Removido orders
     };
     
   } catch (error: any) {

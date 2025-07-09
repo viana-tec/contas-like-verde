@@ -3,10 +3,10 @@
  */
 
 import { useState, useMemo } from 'react';
-import { BalanceOperation, Transaction, FilterOptions } from '../types';
+import { BalanceOperation, FilterOptions } from '../types';
 import { calculateFinancialIndicators, applyFilters } from '../utils';
 
-export const useFilters = (operations: BalanceOperation[], transactions: Transaction[]) => {
+export const useFilters = (operations: BalanceOperation[]) => {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     dateRange: { start: null, end: null },
@@ -19,15 +19,15 @@ export const useFilters = (operations: BalanceOperation[], transactions: Transac
   });
 
   // Aplicar filtros
-  const { operations: filteredOperations, transactions: filteredTransactions } = useMemo(() => 
-    applyFilters(operations, transactions, filters), 
-    [operations, transactions, filters]
+  const { operations: filteredOperations } = useMemo(() => 
+    applyFilters(operations, [], filters), 
+    [operations, filters]
   );
 
   // Calcular indicadores financeiros
   const financialIndicators = useMemo(() => 
-    calculateFinancialIndicators(filteredOperations, filteredTransactions),
-    [filteredOperations, filteredTransactions]
+    calculateFinancialIndicators(filteredOperations, []),
+    [filteredOperations]
   );
 
   const clearFilters = () => {
@@ -47,7 +47,7 @@ export const useFilters = (operations: BalanceOperation[], transactions: Transac
     filtersExpanded,
     filters,
     filteredOperations,
-    filteredTransactions,
+    
     financialIndicators,
     
     // Ações

@@ -24,7 +24,8 @@ export const usePagarmeApi = () => {
     setPendingBalance: apiState.setPendingBalance,
     setLoading: apiState.setLoading,
     setConnectionStatus: apiState.setConnectionStatus,
-    setErrorDetails: apiState.setErrorDetails
+    setErrorDetails: apiState.setErrorDetails,
+    saveApiKey: apiState.saveApiKey
   });
 
   return {

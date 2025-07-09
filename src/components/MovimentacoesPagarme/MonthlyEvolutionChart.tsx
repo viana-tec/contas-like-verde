@@ -15,7 +15,7 @@ export const MonthlyEvolutionChart: React.FC<MonthlyEvolutionChartProps> = ({ op
     
     operations.forEach(operation => {
       if (operation.type === 'credit' && operation.status === 'paid') {
-        const date = new Date(operation.date_created);
+        const date = new Date(operation.created_at);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + operation.amount;
       }

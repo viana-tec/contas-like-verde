@@ -1,19 +1,12 @@
 
-/**
- * Hook para operações da API Pagar.me com progresso detalhado
- */
-
 import { useState } from 'react';
 import { BalanceOperation, Transaction, ConnectionStatus } from '../types';
 import { 
-  fetchPagarmeBalance, 
-  fetchPagarmeOperations, 
-  fetchPagarmeTransactions,
-  testPagarmeConnection 
+  fetchBalance, 
+  fetchAllData,
+  testConnection 
 } from '../services/pagarmeService';
-import { generateMockOperations, generateMockTransactions } from '../mockData';
-import { mergeOperations } from '../utils/operationMerger';
-import { deduplicateOperations } from '../utils/operationDeduplicator';
+import { getMockOperations, getMockTransactions } from '../mockData';
 
 interface UseApiOperationsProps {
   apiKey: string;
@@ -67,7 +60,7 @@ export const useApiOperations = ({
       }
 
       updateProgress('Testando conexão...', 2, 2, 'Verificando conectividade com a API');
-      await testConnection();
+      await testConnectionInternal();
     } catch (error: any) {
       console.error('Erro ao salvar chave:', error);
       await setConnectionStatus('error', error.message || 'Erro ao salvar configuração');
@@ -77,7 +70,7 @@ export const useApiOperations = ({
     }
   };
 
-  const testConnection = async () => {
+  const testConnectionInternal = async () => {
     if (!apiKey) {
       setErrorDetails('Configure uma chave API primeiro');
       return;
@@ -88,15 +81,11 @@ export const useApiOperations = ({
     updateProgress('Testando API...', 1, 1, 'Verificando autenticação');
 
     try {
-      const isValid = await testPagarmeConnection(apiKey);
+      await testConnection(apiKey);
       
-      if (isValid) {
-        await setConnectionStatus('connected');
-        await saveApiKey(apiKey, 'connected');
-        console.log('✅ Conexão estabelecida com sucesso');
-      } else {
-        throw new Error('Chave API inválida ou sem permissões');
-      }
+      await setConnectionStatus('connected');
+      await saveApiKey(apiKey, 'connected');
+      console.log('✅ Conexão estabelecida com sucesso');
     } catch (error: any) {
       console.error('❌ Erro no teste de conexão:', error);
       await setConnectionStatus('error', error.message);
@@ -117,8 +106,8 @@ export const useApiOperations = ({
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       updateProgress('Processando operações...', 2, 3, 'Organizando dados demo');
-      const mockOperations = generateMockOperations();
-      const mockTransactions = generateMockTransactions();
+      const mockOperations = getMockOperations();
+      const mockTransactions = getMockTransactions();
       
       updateProgress('Finalizando...', 3, 3, 'Aplicando dados demo');
       setOperations(mockOperations);
@@ -149,24 +138,19 @@ export const useApiOperations = ({
     try {
       // Buscar saldo
       updateProgress('Buscando saldo...', 1, 4, 'Consultando saldo disponível');
-      const balanceData = await fetchPagarmeBalance(apiKey);
-      setAvailableBalance(balanceData.available / 100);
-      setPendingBalance(balanceData.pending / 100);
+      const balanceData = await fetchBalance(apiKey);
+      setAvailableBalance(balanceData.available);
+      setPendingBalance(balanceData.pending);
 
-      // Buscar operações
-      updateProgress('Buscando operações...', 2, 4, 'Consultando operações de saldo');
-      const operationsData = await fetchPagarmeOperations(apiKey);
+      // Buscar todos os dados
+      updateProgress('Buscando dados...', 2, 4, 'Consultando operações e transações');
+      const allData = await fetchAllData(apiKey, updateProgress);
       
-      updateProgress('Processando operações...', 3, 4, 'Organizando e mesclando dados');
-      const mergedOperations = mergeOperations(operationsData);
-      const deduplicatedOperations = deduplicateOperations(mergedOperations);
-      setOperations(deduplicatedOperations);
+      updateProgress('Processando dados...', 3, 4, 'Organizando dados coletados');
+      setOperations(allData.payablesData);
+      setTransactions(allData.transactionsData);
 
-      // Buscar transações
-      updateProgress('Buscando transações...', 4, 4, 'Consultando histórico de transações');
-      const transactionsData = await fetchPagarmeTransactions(apiKey);
-      setTransactions(transactionsData);
-
+      updateProgress('Finalizando...', 4, 4, 'Concluindo sincronização');
       await setConnectionStatus('connected');
       await saveApiKey(apiKey, 'connected');
       console.log('✅ Dados carregados com sucesso');
@@ -183,7 +167,7 @@ export const useApiOperations = ({
   return {
     progressInfo,
     saveApiKey: saveApiKeyAndTest,
-    testConnection,
+    testConnection: testConnectionInternal,
     loadDemoData,
     fetchData
   };

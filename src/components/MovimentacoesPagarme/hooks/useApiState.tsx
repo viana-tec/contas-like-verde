@@ -1,48 +1,42 @@
-
 /**
  * Hook para gerenciar estado relacionado à API Pagar.me
  */
 
 import { useState } from 'react';
-import { BalanceOperation, Transaction } from '../types';
-import { useApiConfig } from './useApiConfig';
+import { BalanceOperation, Transaction, ConnectionStatus as ConnectionStatusType } from '../types';
 
 export const useApiState = () => {
+  const [apiKey, setApiKey] = useState(localStorage.getItem('pagarme_api_key') || '');
   const [operations, setOperations] = useState<BalanceOperation[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [availableBalance, setAvailableBalance] = useState<number>(0);
   const [pendingBalance, setPendingBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
-
-  const apiConfig = useApiConfig();
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('idle');
+  const [errorDetails, setErrorDetails] = useState<string>('');
 
   const hasData = operations.length > 0 || transactions.length > 0;
 
   return {
     // Estado
-    apiKey: apiConfig.apiKey,
+    apiKey,
     operations,
     transactions,
     availableBalance,
     pendingBalance,
     loading,
-    connectionStatus: apiConfig.connectionStatus,
-    errorDetails: apiConfig.errorDetails,
+    connectionStatus,
+    errorDetails,
     hasData,
     
     // Setters
-    setApiKey: apiConfig.setApiKey,
+    setApiKey,
     setOperations,
     setTransactions,
     setAvailableBalance,
     setPendingBalance,
     setLoading,
-    setConnectionStatus: apiConfig.updateConnectionStatus,
-    setErrorDetails: (error: string) => apiConfig.updateConnectionStatus(apiConfig.connectionStatus, error),
-    
-    // Funções do banco
-    saveApiKey: apiConfig.saveApiConfig,
-    loadApiConfig: apiConfig.loadApiConfig,
-    isLoadingConfig: apiConfig.isLoading
+    setConnectionStatus,
+    setErrorDetails
   };
 };

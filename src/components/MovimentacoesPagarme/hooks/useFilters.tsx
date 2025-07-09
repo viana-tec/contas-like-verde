@@ -1,4 +1,3 @@
-
 /**
  * Hook para gerenciar filtros e dados filtrados
  */

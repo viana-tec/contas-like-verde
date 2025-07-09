@@ -11,6 +11,7 @@ import { OperationsTable } from './OperationsTable';
 import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { BalanceCards } from './BalanceCards';
+import { ApiDiagnostics } from './ApiDiagnostics';
 import { usePagarmeApi } from './hooks/usePagarmeApi';
 
 export const MovimentacoesPagarme = () => {
@@ -62,6 +63,12 @@ export const MovimentacoesPagarme = () => {
         loading={loading}
         onRefresh={fetchData}
         progressInfo={progressInfo}
+      />
+
+      <ApiDiagnostics
+        apiKey={apiKey}
+        totalOperations={operations.length}
+        totalTransactions={transactions.length}
       />
 
       {!apiKey && (

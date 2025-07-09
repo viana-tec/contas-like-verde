@@ -1,7 +1,7 @@
 
 /**
  * Hook para usar o coletor de dados da Pagar.me
- * Fornece interface reativa para coleta de dados
+ * CORRIGIDO: Tratamento de erros melhorado
  */
 
 import { useState, useCallback } from 'react';
@@ -39,6 +39,10 @@ export const usePagarmeCollector = () => {
       maxPages?: number;
     }
   ) => {
+    if (!token.trim()) {
+      throw new Error('Token é obrigatório');
+    }
+
     setState(prev => ({
       ...prev,
       loading: true,
@@ -47,9 +51,11 @@ export const usePagarmeCollector = () => {
     }));
 
     try {
+      console.log(`🚀 [HOOK] Iniciando coleta para ${endpoint}`);
+      
       const result = await pagarmeCollector.coletarTodasMovimentacoes({
         endpoint,
-        token,
+        token: token.trim(),
         pageSize: options?.pageSize || 100,
         maxPages: options?.maxPages || 1000,
         onProgress: (page, totalCollected, info) => {
@@ -73,6 +79,8 @@ export const usePagarmeCollector = () => {
       return result;
 
     } catch (error: any) {
+      console.error(`❌ [HOOK] Erro na coleta:`, error);
+      
       setState(prev => ({
         ...prev,
         loading: false,
@@ -91,7 +99,11 @@ export const usePagarmeCollector = () => {
   }, []);
 
   const testarConexao = useCallback(async (token: string) => {
-    return await pagarmeCollector.testarConexao(token);
+    if (!token.trim()) {
+      throw new Error('Token é obrigatório');
+    }
+
+    return await pagarmeCollector.testarConexao(token.trim());
   }, []);
 
   const limparResultados = useCallback(() => {
@@ -103,12 +115,9 @@ export const usePagarmeCollector = () => {
   }, []);
 
   return {
-    // Estado
     loading: state.loading,
     progress: state.progress,
     result: state.result,
-    
-    // Ações
     coletarDados,
     testarConexao,
     limparResultados

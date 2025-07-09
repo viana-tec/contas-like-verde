@@ -1,8 +1,10 @@
 
 /**
  * Serviço para coleta completa de dados da API v5 Pagar.me
- * Implementa paginação automática para buscar todos os dados
+ * CORRIGIDO: Usa edge function pagarme-proxy para contornar CORS
  */
+
+import { supabase } from '@/integrations/supabase/client';
 
 interface CollectionConfig {
   endpoint: 'orders' | 'payments' | 'transactions';
@@ -22,10 +24,8 @@ interface CollectionResult {
 }
 
 export class PagarmeCollector {
-  private baseUrl = 'https://api.pagar.me/core/v5';
-  
   /**
-   * Busca todos os dados com paginação automática
+   * Busca todos os dados com paginação automática usando edge function
    */
   async coletarTodasMovimentacoes(config: CollectionConfig): Promise<CollectionResult> {
     const {
@@ -38,7 +38,6 @@ export class PagarmeCollector {
 
     console.log(`🚀 [COLLECTOR] Iniciando coleta completa de ${endpoint}`);
     
-    // Variáveis de controle do fluxo
     let pagina = 1;
     const tamanhoPagina = pageSize;
     let continuarLoop = true;
@@ -49,10 +48,8 @@ export class PagarmeCollector {
       while (continuarLoop && pagina <= maxPages) {
         console.log(`📄 [COLLECTOR] Página ${pagina} - Buscando ${endpoint}...`);
         
-        // Callback de progresso
         onProgress?.(pagina, resultadoFinal.length, `Coletando página ${pagina}...`);
         
-        // Fazer requisição para a página atual
         const dadosPagina = await this.buscarPagina(endpoint, token, pagina, tamanhoPagina);
         
         if (!dadosPagina.success) {
@@ -63,17 +60,13 @@ export class PagarmeCollector {
         
         console.log(`📊 [COLLECTOR] Página ${pagina}: ${resultados.length} resultados`);
         
-        // Adicionar resultados à lista final
         resultadoFinal.push(...resultados);
         
-        // Verificar se deve continuar
         if (resultados.length < tamanhoPagina) {
           console.log(`✅ [COLLECTOR] Última página detectada (${resultados.length} < ${tamanhoPagina})`);
           continuarLoop = false;
         } else {
           pagina++;
-          
-          // Pequena pausa entre requisições para evitar rate limit
           await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
@@ -105,7 +98,7 @@ export class PagarmeCollector {
   }
   
   /**
-   * Busca uma página específica da API
+   * Busca uma página específica usando a edge function pagarme-proxy
    */
   private async buscarPagina(
     endpoint: string, 
@@ -115,56 +108,40 @@ export class PagarmeCollector {
   ): Promise<{ success: boolean; data?: any[]; error?: string }> {
     
     try {
-      const url = `${this.baseUrl}/${endpoint}?page=${page}&size=${size}`;
+      const apiEndpoint = `/core/v5/${endpoint}?page=${page}&size=${size}`;
       
-      console.log(`🌐 [REQUEST] ${url}`);
+      console.log(`🌐 [REQUEST] Chamando edge function para: ${apiEndpoint}`);
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
+        body: {
+          endpoint: apiEndpoint,
+          apiKey: token
         }
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [REQUEST] Erro HTTP ${response.status}: ${errorText}`);
-        
-        let errorMessage = `Erro ${response.status}`;
-        
-        switch (response.status) {
-          case 401:
-            errorMessage = 'Token inválido ou expirado';
-            break;
-          case 403:
-            errorMessage = 'Acesso negado - verifique as permissões do token';
-            break;
-          case 404:
-            errorMessage = 'Endpoint não encontrado';
-            break;
-          case 429:
-            errorMessage = 'Muitas requisições - aguarde um momento';
-            break;
-          case 500:
-            errorMessage = 'Erro interno do servidor Pagar.me';
-            break;
-        }
-        
+      if (error) {
+        console.error(`❌ [REQUEST] Erro da edge function:`, error);
         return {
           success: false,
-          error: errorMessage
+          error: error.message || 'Erro na edge function'
         };
       }
       
-      const data = await response.json();
+      if (data?.error) {
+        console.error(`❌ [REQUEST] Erro da API:`, data.error);
+        return {
+          success: false,
+          error: data.error
+        };
+      }
       
-      console.log(`✅ [REQUEST] Página ${page} - ${data.data?.length || 0} resultados`);
+      const resultados = data?.data || [];
+      
+      console.log(`✅ [REQUEST] Página ${page} - ${resultados.length} resultados`);
       
       return {
         success: true,
-        data: data.data || []
+        data: resultados
       };
       
     } catch (error: any) {
@@ -197,5 +174,4 @@ export class PagarmeCollector {
   }
 }
 
-// Instância singleton para uso na aplicação
 export const pagarmeCollector = new PagarmeCollector();

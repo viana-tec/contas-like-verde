@@ -176,6 +176,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pagarme_api_config: {
+        Row: {
+          api_key: string
+          connection_status: string
+          created_at: string
+          error_details: string | null
+          id: string
+          last_sync_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          connection_status?: string
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          last_sync_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          connection_status?: string
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          last_sync_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pagarme_operations: {
         Row: {
           acquirer_name: string | null

@@ -1,4 +1,3 @@
-
 /**
  * Serviço para coleta completa de dados da API v5 Pagar.me
  * CORRIGIDO: Usa edge function pagarme-proxy para contornar CORS
@@ -53,6 +52,7 @@ export class PagarmeCollector {
         const dadosPagina = await this.buscarPagina(endpoint, token, pagina, tamanhoPagina);
         
         if (!dadosPagina.success) {
+          console.error(`❌ [COLLECTOR] Erro na página ${pagina}:`, dadosPagina.error);
           throw new Error(dadosPagina.error || 'Erro na requisição');
         }
         
@@ -67,7 +67,8 @@ export class PagarmeCollector {
           continuarLoop = false;
         } else {
           pagina++;
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // Pausa entre requisições para evitar rate limiting
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
@@ -111,27 +112,34 @@ export class PagarmeCollector {
       const apiEndpoint = `/core/v5/${endpoint}?page=${page}&size=${size}`;
       
       console.log(`🌐 [REQUEST] Chamando edge function para: ${apiEndpoint}`);
+      console.log(`🔑 [REQUEST] Token: ${token.substring(0, 10)}...`);
+      
+      const requestBody = {
+        endpoint: apiEndpoint,
+        apiKey: token.trim()
+      };
+      
+      console.log(`📤 [REQUEST] Enviando requisição:`, requestBody);
       
       const { data, error } = await supabase.functions.invoke('pagarme-proxy', {
-        body: {
-          endpoint: apiEndpoint,
-          apiKey: token
-        }
+        body: requestBody
       });
       
       if (error) {
         console.error(`❌ [REQUEST] Erro da edge function:`, error);
         return {
           success: false,
-          error: error.message || 'Erro na edge function'
+          error: `Erro na edge function: ${error.message}`
         };
       }
+      
+      console.log(`📥 [REQUEST] Resposta recebida:`, data);
       
       if (data?.error) {
         console.error(`❌ [REQUEST] Erro da API:`, data.error);
         return {
           success: false,
-          error: data.error
+          error: `Erro da API: ${data.error}`
         };
       }
       
@@ -149,7 +157,7 @@ export class PagarmeCollector {
       
       return {
         success: false,
-        error: error.message || 'Erro de conexão'
+        error: `Erro de conexão: ${error.message}`
       };
     }
   }

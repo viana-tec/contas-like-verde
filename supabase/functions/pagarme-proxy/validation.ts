@@ -1,45 +1,79 @@
 
-import { ValidationResult } from './types.ts';
-
-export function validateApiKey(apiKey: string): ValidationResult {
-  if (!apiKey || typeof apiKey !== 'string') {
-    return { isValid: false, error: 'Chave API não fornecida' };
-  }
-  
-  // Remover espaços e verificar comprimento mínimo
-  const cleanKey = apiKey.trim();
-  if (cleanKey.length < 10) {
-    return { isValid: false, error: 'Chave API muito curta' };
-  }
-  
-  // Verificar se contém apenas caracteres válidos (letras, números, underscore, hífen)
-  const validKeyPattern = /^[a-zA-Z0-9_-]+$/;
-  if (!validKeyPattern.test(cleanKey)) {
-    return { isValid: false, error: 'Formato da chave não reconhecido' };
-  }
-
-  return { isValid: true };
-}
+import { ValidationResult, PagarmeProxyRequest } from './types.ts';
 
 export function validateRequest(body: any): ValidationResult {
-  if (!body) {
-    return { isValid: false, error: 'Body vazio' };
-  }
-
-  const { endpoint, apiKey } = body;
+  console.log(`🔍 [VALIDATION] Validando requisição...`);
   
-  if (!endpoint) {
-    return { isValid: false, error: 'Endpoint obrigatório' };
+  if (!body) {
+    console.error(`❌ [VALIDATION] Body está vazio`);
+    return {
+      isValid: false,
+      error: 'Body da requisição é obrigatório'
+    };
   }
 
-  if (!apiKey) {
-    return { isValid: false, error: 'Chave API obrigatória' };
+  if (!body.endpoint) {
+    console.error(`❌ [VALIDATION] Endpoint não fornecido`);
+    return {
+      isValid: false,
+      error: 'Parâmetro endpoint é obrigatório'
+    };
   }
 
-  const keyValidation = validateApiKey(apiKey);
-  if (!keyValidation.isValid) {
-    return keyValidation;
+  if (!body.apiKey) {
+    console.error(`❌ [VALIDATION] ApiKey não fornecida`);
+    return {
+      isValid: false,
+      error: 'Parâmetro apiKey é obrigatório'
+    };
   }
 
-  return { isValid: true };
+  if (typeof body.endpoint !== 'string') {
+    console.error(`❌ [VALIDATION] Endpoint deve ser string`);
+    return {
+      isValid: false,
+      error: 'Endpoint deve ser uma string'
+    };
+  }
+
+  if (typeof body.apiKey !== 'string') {
+    console.error(`❌ [VALIDATION] ApiKey deve ser string`);
+    return {
+      isValid: false,
+      error: 'ApiKey deve ser uma string'
+    };
+  }
+
+  // Validar formato do endpoint
+  const endpoint = body.endpoint.trim();
+  if (!endpoint.startsWith('/core/v5/')) {
+    console.error(`❌ [VALIDATION] Endpoint inválido: ${endpoint}`);
+    return {
+      isValid: false,
+      error: 'Endpoint deve começar com /core/v5/'
+    };
+  }
+
+  // Validar formato da API key
+  const apiKey = body.apiKey.trim();
+  if (!apiKey.startsWith('sk_') && !apiKey.startsWith('ak_')) {
+    console.error(`❌ [VALIDATION] ApiKey com formato inválido`);
+    return {
+      isValid: false,
+      error: 'ApiKey deve começar com sk_ ou ak_'
+    };
+  }
+
+  if (apiKey.length < 20) {
+    console.error(`❌ [VALIDATION] ApiKey muito curta`);
+    return {
+      isValid: false,
+      error: 'ApiKey parece estar incompleta'
+    };
+  }
+
+  console.log(`✅ [VALIDATION] Validação passou`);
+  return {
+    isValid: true
+  };
 }

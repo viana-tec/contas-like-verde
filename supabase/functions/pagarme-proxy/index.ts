@@ -9,6 +9,7 @@ serve(async (req) => {
   const timestamp = new Date().toISOString();
   console.log(`\n🚀 [${timestamp}] NOVA REQUISIÇÃO EDGE FUNCTION`);
   console.log(`📋 Método: ${req.method}, URL: ${req.url}`);
+  console.log(`📋 Headers:`, Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -16,12 +17,25 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Verificar se é POST
+  if (req.method !== 'POST') {
+    console.error(`❌ Método não permitido: ${req.method}`);
+    return createErrorResponse(
+      'Método não permitido',
+      'Apenas POST é aceito',
+      405,
+      timestamp
+    );
+  }
+
   try {
     // Parse request body
     let body;
     try {
       body = await parseRequestBody(req);
+      console.log(`✅ Body parseado com sucesso`);
     } catch (parseError) {
+      console.error(`❌ Erro no parse do body:`, parseError);
       return handleParseError(parseError);
     }
     
@@ -37,15 +51,21 @@ serve(async (req) => {
       );
     }
 
+    console.log(`✅ Validação passou, fazendo requisição para API`);
+
     // Make API request
-    return await makeApiRequest(body.endpoint, body.apiKey, timestamp);
+    const result = await makeApiRequest(body.endpoint, body.apiKey, timestamp);
+    
+    console.log(`✅ Requisição completada com sucesso`);
+    return result;
 
   } catch (error: any) {
-    console.error(`💥 ERRO CRÍTICO:`, error);
+    console.error(`💥 ERRO CRÍTICO NA EDGE FUNCTION:`, error);
+    console.error(`💥 Stack trace:`, error.stack);
     
     return createErrorResponse(
-      'Erro interno',
-      error.message || 'Erro desconhecido',
+      'Erro interno do servidor',
+      error.message || 'Erro desconhecido na edge function',
       500,
       timestamp
     );

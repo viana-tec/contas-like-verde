@@ -3,21 +3,30 @@ import { corsHeaders, PagarmeProxyRequest } from './types.ts';
 import { handleApiError, handleFetchError, createErrorResponse } from './error-handler.ts';
 
 export async function parseRequestBody(req: Request): Promise<PagarmeProxyRequest> {
+  console.log(`📝 [PARSE] Lendo body da requisição...`);
+  
   const text = await req.text();
-  console.log(`📝 Body recebido (${text.length} chars):`, text.substring(0, 200));
+  console.log(`📝 [PARSE] Body recebido (${text.length} chars):`, text.substring(0, 500));
   
   if (!text?.trim()) {
-    throw new Error('Body vazio');
+    throw new Error('Body da requisição está vazio');
   }
   
-  const body = JSON.parse(text);
-  console.log(`✅ Body parseado:`, { 
-    hasEndpoint: !!body.endpoint, 
-    hasApiKey: !!body.apiKey,
-    keyLength: body.apiKey?.length || 0 
-  });
+  try {
+    const body = JSON.parse(text);
+    console.log(`✅ [PARSE] JSON parseado com sucesso`);
+    console.log(`📋 [PARSE] Dados recebidos:`, { 
+      hasEndpoint: !!body.endpoint, 
+      hasApiKey: !!body.apiKey,
+      endpointLength: body.endpoint?.length || 0,
+      keyLength: body.apiKey?.length || 0 
+    });
 
-  return body;
+    return body;
+  } catch (jsonError) {
+    console.error(`❌ [PARSE] Erro no parse JSON:`, jsonError);
+    throw new Error('JSON inválido no body da requisição');
+  }
 }
 
 export async function makeApiRequest(
@@ -27,24 +36,27 @@ export async function makeApiRequest(
 ): Promise<Response> {
   const baseUrl = 'https://api.pagar.me';
   const fullUrl = `${baseUrl}${endpoint}`;
-  console.log(`🌐 URL construída: ${fullUrl}`);
   
-  // Headers da requisição - API v5 usa Basic Auth (não Bearer)
+  console.log(`🌐 [REQUEST] URL construída: ${fullUrl}`);
+  console.log(`🔑 [REQUEST] Usando chave: ${apiKey.substring(0, 10)}...`);
+  
+  // Headers da requisição - API v5 usa Basic Auth
   const requestHeaders = {
     'Authorization': `Basic ${btoa(`${apiKey.trim()}:`)}`,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'User-Agent': 'Lovable-Integration/1.0',
+    'User-Agent': 'Supabase-Edge-Function/1.0',
   };
   
-  console.log(`📤 Fazendo requisição...`);
+  console.log(`📤 [REQUEST] Headers configurados`);
+  console.log(`📤 [REQUEST] Fazendo requisição GET para Pagar.me...`);
 
-  // Requisição com timeout
+  // Timeout mais longo para requisições grandes
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.log(`⏰ Timeout atingido`);
+    console.log(`⏰ [REQUEST] Timeout de 30s atingido`);
     controller.abort();
-  }, 25000);
+  }, 30000);
   
   try {
     const response = await fetch(fullUrl, {
@@ -54,37 +66,56 @@ export async function makeApiRequest(
     });
 
     clearTimeout(timeoutId);
-    console.log(`📥 Resposta: ${response.status} ${response.statusText}`);
+    
+    console.log(`📥 [REQUEST] Resposta recebida: ${response.status} ${response.statusText}`);
+    console.log(`📥 [REQUEST] Headers da resposta:`, Object.fromEntries(response.headers.entries()));
 
     const responseText = await response.text();
-    console.log(`📄 Response (${responseText.length} chars):`, responseText.substring(0, 300));
+    console.log(`📄 [REQUEST] Response body (${responseText.length} chars):`, responseText.substring(0, 500));
     
     let data;
     try {
       data = responseText ? JSON.parse(responseText) : {};
-    } catch (e) {
-      console.error(`⚠️ Erro parse JSON:`, e);
+      console.log(`✅ [REQUEST] JSON da resposta parseado com sucesso`);
+    } catch (parseError) {
+      console.error(`❌ [REQUEST] Erro no parse do JSON da resposta:`, parseError);
       return createErrorResponse(
         'Resposta inválida da API',
-        'API não retornou JSON válido',
+        'API Pagar.me não retornou JSON válido',
         502,
         timestamp
       );
     }
     
     if (!response.ok) {
+      console.error(`❌ [REQUEST] Erro HTTP ${response.status}:`, data);
       return handleApiError(response, data, timestamp);
     }
 
-    console.log(`🎉 SUCESSO! Dados recebidos`);
+    console.log(`🎉 [REQUEST] SUCESSO! Dados recebidos da API`);
+    
+    // Log dos dados para debug
+    if (data?.data) {
+      console.log(`📊 [REQUEST] Dados recebidos: ${data.data.length} registros`);
+      if (data.data.length > 0) {
+        console.log(`📋 [REQUEST] Primeiro registro:`, data.data[0]);
+      }
+    }
     
     return new Response(
       JSON.stringify(data),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
 
   } catch (fetchError: any) {
     clearTimeout(timeoutId);
+    console.error(`❌ [REQUEST] Erro na requisição:`, fetchError);
     return handleFetchError(fetchError, timestamp);
   }
 }

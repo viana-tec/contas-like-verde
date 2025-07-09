@@ -108,12 +108,15 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
     // Status correto: priorizar status do order principal
     let correctStatus = order.status || charge.status || 'unknown';
     
+    // AJUSTE: Considerar TODAS as transações pendentes como pagas
+    if (correctStatus === 'pending' || correctStatus === 'pending_payment' || correctStatus === 'waiting_payment') {
+      correctStatus = 'paid';
+    }
+    
     // Mapear status específicos para cartão de crédito
     if (paymentMethod === 'credit_card') {
       if (correctStatus === 'paid' || correctStatus === 'authorized') {
         correctStatus = 'paid';
-      } else if (correctStatus === 'pending_payment' || correctStatus === 'waiting_payment') {
-        correctStatus = 'pending';
       }
     }
     
@@ -171,15 +174,22 @@ export const mapPayablesToOperations = (payablesData: any[]): any[] => {
     // Extrair dados detalhados
     const detailedData = extractDetailedData(basePayable, 'payable');
     
-    // Para cartão de crédito, ajustar status baseado no conjunto de payables
+    // Status correto: considerar TODAS as transações pendentes como pagas
     let correctStatus = basePayable.status || 'unknown';
+    
+    // AJUSTE: Considerar TODAS as transações pendentes como pagas
+    if (correctStatus === 'pending' || correctStatus === 'pending_payment' || correctStatus === 'waiting_payment') {
+      correctStatus = 'paid';
+    }
+    
     if (basePayable.payment_method === 'credit_card') {
       // Se todos os payables estão pagos, marcar como pago
-      const allPaid = payables.every(p => p.status === 'paid' || p.status === 'available');
+      const allPaid = payables.every(p => {
+        const pStatus = p.status;
+        return pStatus === 'paid' || pStatus === 'available' || pStatus === 'pending' || pStatus === 'pending_payment' || pStatus === 'waiting_payment';
+      });
       if (allPaid) {
         correctStatus = 'paid';
-      } else {
-        correctStatus = 'pending';
       }
     }
     
@@ -219,11 +229,19 @@ export const mapTransactions = (transactionsData: any[]): any[] => {
       // Extrair TODOS os dados detalhados
       const detailedData = extractDetailedData(transaction, 'transaction');
       
+      // Status correto: considerar TODAS as transações pendentes como pagas
+      let correctStatus = transaction.status || 'unknown';
+      
+      // AJUSTE: Considerar TODAS as transações pendentes como pagas
+      if (correctStatus === 'pending' || correctStatus === 'pending_payment' || correctStatus === 'waiting_payment') {
+        correctStatus = 'paid';
+      }
+      
       return {
         id: String(transaction.id),
         // CORREÇÃO: Valores em centavos convertidos para reais
         amount: (Number(transaction.amount) || 0) / 100,
-        status: transaction.status || 'unknown',
+        status: correctStatus,
         payment_method: transaction.payment_method || 'unknown',
         created_at: transaction.created_at || new Date().toISOString(),
         paid_at: transaction.paid_at,

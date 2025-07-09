@@ -1,10 +1,9 @@
-
 export interface BalanceOperation {
   id: string;
   type: string;
   status: string;
   amount: number;
-  fee?: number;
+  fee: number; // Campo obrigatório para taxas
   created_at: string;
   updated_at?: string;
   description?: string;

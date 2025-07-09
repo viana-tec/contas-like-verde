@@ -15,9 +15,9 @@ export const fetchAllDataUnlimited = async (
   let allData: any[] = [];
   let page = 1;
   let pageSize = 100; // API v5 usa 'size' e max 100
-  let maxPages = 5000; // Aumentar limite para coleta completa de charges
+  let maxPages = 10000; // Aumentar ainda mais o limite para garantir coleta completa
   let consecutiveEmptyPages = 0;
-  const maxConsecutiveEmpty = 3;
+  const maxConsecutiveEmpty = 5;
   
   console.log(`📄 [COLETA] Iniciando coleta MASSIVA v5: ${endpoint}`);
   
@@ -25,7 +25,7 @@ export const fetchAllDataUnlimited = async (
     // API v5 usa 'size' e 'page' (não 'count')
     const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}size=${pageSize}&page=${page}`;
     
-    onProgress?.(page, maxPages, `Coletando página ${page}...`);
+    onProgress?.(page, maxPages, `Coletando página ${page}... (${allData.length} registros)`);
     console.log(`📄 [COLETA] Página ${page}/${maxPages}: ${fullEndpoint}`);
     
     try {
@@ -66,14 +66,14 @@ export const fetchAllDataUnlimited = async (
       page++;
       
       // Pausa otimizada para evitar rate limit
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
       
     } catch (error: any) {
       console.error(`❌ [COLETA] Erro na página ${page}:`, error);
       
       if (error.message?.includes('429') || error.message?.includes('rate') || error.message?.includes('Limite')) {
-        console.log(`📄 [RATE_LIMIT] Aguardando 5s...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log(`📄 [RATE_LIMIT] Aguardando 3s...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         continue; // Tentar a mesma página novamente
       }
       
@@ -90,26 +90,34 @@ export const fetchAllDataUnlimited = async (
   return allData;
 };
 
-// Função MASSIVA para buscar TODAS as charges (ch_) - VERSÃO FOCADA
+// Função MASSIVA para buscar TODAS as charges (ch_) com filtros de data corretos
 export const fetchAllData = async (
   apiKey: string, 
   onProgress?: (stage: string, current: number, total: number, info: string) => void
 ) => {
-  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE CHARGES (ch_)...');
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE CHARGES (ch_) com filtros de data...');
   
-  // Período estendido de 24 meses para capturar TODOS os dados históricos
-  const twentyFourMonthsAgo = new Date();
-  twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
-  const dateParam = twentyFourMonthsAgo.toISOString().split('T')[0];
+  // Período estendido de 36 meses para capturar TODOS os dados históricos
+  const thirtyFiveMonthsAgo = new Date();
+  thirtyFiveMonthsAgo.setMonth(thirtyFiveMonthsAgo.getMonth() - 36);
+  const createdSince = thirtyFiveMonthsAgo.toISOString().split('T')[0];
   
-  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (24 meses)`);
+  // Data atual como limite
+  const today = new Date();
+  const createdUntil = today.toISOString().split('T')[0];
+  
+  console.log(`📅 [MASTER] Período: ${createdSince} até ${createdUntil} (36 meses)`);
   
   try {
-    // FASE 1: Coleta MASSIVA focada SOMENTE em charges
-    console.log('🚀 [FASE 1] Iniciando coleta massiva de charges...');
+    // FASE 1: Coleta MASSIVA focada SOMENTE em charges com filtros de data
+    console.log('🚀 [FASE 1] Iniciando coleta massiva de charges com filtros de data...');
     onProgress?.('Coletando charges', 1, 2, 'Iniciando coleta de todas as charges...');
     
-    const chargesEndpoint = `/core/v5/charges?created_since=${dateParam}`;
+    // Usar filtros corretos de data para payables/charges
+    const chargesEndpoint = `/core/v5/charges?created_since=${createdSince}&created_until=${createdUntil}`;
+    
+    console.log(`📡 [ENDPOINT] ${chargesEndpoint}`);
+    
     const chargesData = await fetchAllDataUnlimited(chargesEndpoint, apiKey, (current, total, info) => {
       onProgress?.('Coletando charges', 1, 2, `Charges: ${info}`);
     });
@@ -131,6 +139,8 @@ export const fetchAllData = async (
     };
     
     console.log(`🎯 [MASTER] COLETA FINALIZADA:`, finalStats);
+    console.log(`📋 [SAMPLE] Amostra de charge:`, validCharges[0]);
+    
     onProgress?.('Concluído', 2, 2, `${finalStats.validCharges} charges válidas coletadas!`);
 
     return {

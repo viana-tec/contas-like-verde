@@ -6,7 +6,7 @@
 import { useToast } from '@/hooks/use-toast';
 import { BalanceOperation, Transaction } from '../types';
 import { getMockOperations, getMockTransactions } from '../mockData';
-import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
+import { validateApiKey, mapChargesToOperations, mapTransactions } from '../utils/pagarmeUtils';
 import { testConnection, fetchAllDataWithBalance } from '../services/pagarmeService';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
@@ -281,23 +281,21 @@ export const useApiOperations = ({
       };
 
       // Use the combined service function that includes balance data
-      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllDataWithBalance(apiKey, onProgress);
+      const { transactionsData, balanceData, payablesData } = await fetchAllDataWithBalance(apiKey, onProgress);
       
       console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
-        ordersRaw: ordersData.length,
-        payablesRaw: payablesData.length,
+        chargesRaw: payablesData.length,
         transactionsRaw: transactionsData.length,
         balance: balanceData
       });
       
       setProgressInfo({ stage: 'Processando dados', current: 4, total: 5, info: 'Formatando operações...' });
       
-      // Mapear orders para operações E payables para operações também 
-      const orderOperations = mapOrdersToOperations(ordersData);
-      const payableOperations = mapPayablesToOperations(payablesData);
+      // Mapear charges para operações (sem orders)
+      const chargeOperations = mapChargesToOperations(payablesData);
       
-      // Combinar todas as operações
-      const allOperations = [...orderOperations, ...payableOperations];
+      // Usar apenas operações de charges
+      const allOperations = chargeOperations;
       
       // Converter transações
       const formattedTransactions = mapTransactions(transactionsData);
@@ -314,8 +312,7 @@ export const useApiOperations = ({
       
       console.log(`🎯 [FRONTEND] DADOS PROCESSADOS E SALVOS COM SUCESSO:`, {
         totalOperations: allOperations.length,
-        orderOperations: orderOperations.length,
-        payableOperations: payableOperations.length,
+        chargeOperations: chargeOperations.length,
         formattedTransactions: formattedTransactions.length,
         saldoDisponivel: balanceData.available,
         saldoPendente: balanceData.pending,

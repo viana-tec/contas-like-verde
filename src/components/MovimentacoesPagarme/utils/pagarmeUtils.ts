@@ -90,11 +90,10 @@ const extractDetailedData = (item: any, source: string = 'unknown') => {
   };
 };
 
-// Mapear orders para operações com EXTRAÇÃO COMPLETA
-export const mapOrdersToOperations = (ordersData: any[]): any[] => {
-  return ordersData.map((order: any, index: number) => {
-    const charge = order.charges?.[0] || {};
-    const customer = order.customer || {};
+// Mapear charges para operações com EXTRAÇÃO COMPLETA
+export const mapChargesToOperations = (chargesData: any[]): any[] => {
+  return chargesData.map((charge: any, index: number) => {
+    const customer = charge.customer || {};
     
     // Filtrar apenas PIX e cartão de crédito
     const paymentMethod = charge.payment_method;
@@ -103,65 +102,31 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
     }
     
     // Extrair TODOS os dados detalhados
-    const detailedData = extractDetailedData(charge, 'order');
+    const detailedData = extractDetailedData(charge, 'charge');
     
     return {
-      id: String(order.id || `order_${index}`),
-      type: 'order',
-      status: order.status || charge.status || 'unknown',
+      id: String(charge.id || `charge_${index}`),
+      type: 'charge',
+      status: charge.status || 'unknown',
       // CORREÇÃO: Valores em centavos convertidos para reais
-      amount: (Number(order.amount) || 0) / 100,
-      fee: (Number(charge.fee) || Number(charge.transaction?.fee) || 0) / 100,
-      created_at: order.created_at || new Date().toISOString(),
-      description: `Pedido ${order.code || extractRealTransactionCode(order)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
+      amount: (Number(charge.amount) || 0) / 100,
+      fee: (Number(charge.fee) || 0) / 100,
+      created_at: charge.created_at || new Date().toISOString(),
+      description: `Cobrança ${extractRealTransactionCode(charge)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       
       // Dados COMPLETOS extraídos
       ...detailedData,
       
-      // Dados específicos do order
-      transaction_id: charge.id || charge.transaction?.id,
-      order_id: order.id,
+      // Dados específicos do charge
+      charge_id: charge.id,
       customer: customer,
-      billing: order.billing,
-      real_code: order.code || extractRealTransactionCode(order)
+      billing: charge.billing,
+      real_code: extractRealTransactionCode(charge)
     };
   }).filter(Boolean);
 };
 
-// Mapear payables para operações com EXTRAÇÃO COMPLETA
-export const mapPayablesToOperations = (payablesData: any[]): any[] => {
-  return payablesData
-    .filter((payable: any) => {
-      const paymentMethod = payable.payment_method;
-      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
-    })
-    .map((payable: any) => {
-      // Extrair TODOS os dados detalhados
-      const detailedData = extractDetailedData(payable, 'payable');
-      
-      return {
-        id: String(payable.id),
-        type: 'payable',
-        status: payable.status || 'unknown',
-        // CORREÇÃO: Valores em centavos convertidos para reais
-        amount: (Number(payable.amount) || 0) / 100,
-        fee: (Number(payable.fee) || 0) / 100,
-        created_at: payable.created_at || new Date().toISOString(),
-        description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
-        
-        // Dados COMPLETOS extraídos
-        ...detailedData,
-        
-        // Dados específicos dos payables
-        charge_id: payable.charge_id,
-        recipient_id: payable.recipient_id,
-        payment_date: payable.payment_date,
-        anticipation_fee: (Number(payable.anticipation_fee) || 0) / 100,
-        fraud_coverage_fee: (Number(payable.fraud_coverage_fee) || 0) / 100,
-        real_code: extractRealTransactionCode(payable)
-      };
-    });
-};
+// Função removida - agora usamos mapChargesToOperations
 
 // Mapear transações com EXTRAÇÃO COMPLETA
 export const mapTransactions = (transactionsData: any[]): any[] => {

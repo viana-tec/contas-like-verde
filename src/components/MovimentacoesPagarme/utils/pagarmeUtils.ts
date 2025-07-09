@@ -1,7 +1,7 @@
 
 /**
  * Utilitários para processamento de dados do Pagar.me
- * VERSÃO CORRIGIDA - PRIORIZA STATUS REAL DAS TRANSAÇÕES
+ * VERSÃO OTIMIZADA COM EXTRAÇÃO COMPLETA DE DADOS
  */
 
 // Validação da chave API
@@ -13,10 +13,11 @@ export const validateApiKey = (key: string): boolean => {
   return cleanKey.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(cleanKey);
 };
 
-// Função para extrair código numérico real da transação/pedido
+// Função OTIMIZADA para extrair código numérico real da transação/pedido
 export const extractRealTransactionCode = (item: any): string => {
   // PRIORIDADE 1: Código do pedido/order (como 45812, 45811)
   if (item.code && typeof item.code === 'string') {
+    // Se for numérico, usar direto
     if (/^\d+$/.test(item.code)) {
       return item.code;
     }
@@ -32,7 +33,7 @@ export const extractRealTransactionCode = (item: any): string => {
     return String(item.gateway_id);
   }
   
-  // PRIORIDADE 4: Extrair números do ID
+  // PRIORIDADE 4: Extrair números do ID (para ch_XXXXX extrair parte numérica)
   const idStr = String(item.id || '');
   const numericPart = idStr.replace(/[^0-9]/g, '');
   
@@ -45,100 +46,43 @@ export const extractRealTransactionCode = (item: any): string => {
   return String(timestamp).slice(-5);
 };
 
-// Função para determinar o STATUS REAL da transação/pedido
-const getRealTransactionStatus = (order: any, charge: any): string => {
-  // PRIORIDADE 1: Status do order (mais confiável)
-  if (order.status) {
-    // Mapeamento dos status reais dos orders
-    switch (order.status.toLowerCase()) {
-      case 'paid':
-        return 'paid';
-      case 'pending':
-      case 'waiting_payment':
-        return 'pending';
-      case 'processing':
-        return 'processing';
-      case 'canceled':
-      case 'cancelled':
-        return 'refused';
-      case 'failed':
-        return 'refused';
-      default:
-        return order.status;
-    }
-  }
-  
-  // PRIORIDADE 2: Status do charge/transação
-  if (charge?.status) {
-    switch (charge.status.toLowerCase()) {
-      case 'paid':
-        return 'paid';
-      case 'pending':
-      case 'waiting_payment':
-        return 'pending';
-      case 'processing':
-        return 'processing';
-      case 'canceled':
-      case 'cancelled':
-      case 'failed':
-        return 'refused';
-      default:
-        return charge.status;
-    }
-  }
-  
-  // PRIORIDADE 3: Status da última transação
-  if (charge?.last_transaction?.status) {
-    switch (charge.last_transaction.status.toLowerCase()) {
-      case 'paid':
-        return 'paid';
-      case 'authorized':
-        return 'paid'; // Cartão autorizado = pago
-      case 'pending':
-        return 'pending';
-      case 'processing':
-        return 'processing';
-      case 'refused':
-      case 'failed':
-        return 'refused';
-      default:
-        return charge.last_transaction.status;
-    }
-  }
-  
-  return 'unknown';
-};
-
-// Função para extrair dados detalhados
+// Função para extrair TODOS os dados detalhados de uma transação/operação
 const extractDetailedData = (item: any, source: string = 'unknown') => {
+  // Dados do cartão (aninhados ou diretos)
   const card = item.card || item.last_transaction?.card || {};
+  
+  // Dados da transação (podem estar aninhados)
   const transaction = item.last_transaction || item.transaction || item;
   
+  // Dados do charge (para orders)
+  const charge = item.charges?.[0] || item;
+  
   return {
-    payment_method: item.payment_method || transaction.payment_method || 'unknown',
-    installments: Number(item.installments) || Number(transaction.installments) || 1,
+    // Dados básicos CORRIGIDOS
+    payment_method: item.payment_method || charge.payment_method || transaction.payment_method || 'unknown',
+    installments: Number(item.installments) || Number(charge.installments) || Number(transaction.installments) || 1,
     
     // Dados do adquirente
-    acquirer_name: item.acquirer_name || transaction.acquirer_name,
-    acquirer_response_code: item.acquirer_response_code || transaction.acquirer_response_code,
+    acquirer_name: item.acquirer_name || charge.acquirer_name || transaction.acquirer_name,
+    acquirer_response_code: item.acquirer_response_code || charge.acquirer_response_code || transaction.acquirer_response_code,
     
     // Códigos de autorização
-    authorization_code: item.authorization_code || transaction.authorization_code,
-    tid: item.tid || transaction.tid,
-    nsu: item.nsu || transaction.nsu,
+    authorization_code: item.authorization_code || charge.authorization_code || transaction.authorization_code,
+    tid: item.tid || charge.tid || transaction.tid,
+    nsu: item.nsu || charge.nsu || transaction.nsu,
     
     // Dados do cartão
-    card_brand: card.brand || item.card_brand || transaction.card_brand,
-    card_last_four_digits: card.last_four_digits || item.card_last_four_digits || transaction.card_last_four_digits,
+    card_brand: card.brand || item.card_brand || charge.card_brand || transaction.card_brand,
+    card_last_four_digits: card.last_four_digits || item.card_last_four_digits || charge.card_last_four_digits || transaction.card_last_four_digits,
     
     // Dados técnicos
-    soft_descriptor: item.soft_descriptor || transaction.soft_descriptor,
-    gateway_response_time: item.gateway_response_time || transaction.gateway_response_time,
-    antifraud_score: item.antifraud_score || transaction.antifraud_score,
+    soft_descriptor: item.soft_descriptor || charge.soft_descriptor || transaction.soft_descriptor,
+    gateway_response_time: item.gateway_response_time || charge.gateway_response_time || transaction.gateway_response_time,
+    antifraud_score: item.antifraud_score || charge.antifraud_score || transaction.antifraud_score,
     
     // Dados adicionais
-    gateway_id: item.gateway_id || transaction.gateway_id,
-    reference_key: item.reference_key || transaction.reference_key,
+    gateway_id: item.gateway_id || charge.gateway_id || transaction.gateway_id,
+    reference_key: item.reference_key || charge.reference_key || transaction.reference_key,
     
     // Metadata
     source,
@@ -146,10 +90,8 @@ const extractDetailedData = (item: any, source: string = 'unknown') => {
   };
 };
 
-// CORREÇÃO PRINCIPAL: Mapear orders com STATUS REAL (não dos payables)
+// Mapear orders para operações com EXTRAÇÃO COMPLETA
 export const mapOrdersToOperations = (ordersData: any[]): any[] => {
-  console.log('🔄 [MAPEAMENTO] Processando orders com STATUS CORRETO...');
-  
   return ordersData.map((order: any, index: number) => {
     const charge = order.charges?.[0] || {};
     const customer = order.customer || {};
@@ -160,69 +102,54 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
       return null;
     }
     
-    // CORREÇÃO: Usar STATUS REAL da transação/pedido
-    const realStatus = getRealTransactionStatus(order, charge);
-    
-    // Extrair dados detalhados
+    // Extrair TODOS os dados detalhados
     const detailedData = extractDetailedData(charge, 'order');
-    
-    // CORREÇÃO: Usar valor TOTAL do order (não individual dos payables)
-    const totalAmount = (Number(order.amount) || 0) / 100;
-    const totalFee = (Number(charge.fee) || Number(charge.last_transaction?.fee) || 0) / 100;
-    
-    console.log(`📋 [ORDER] ${order.code}: Status real = ${realStatus}, Valor = R$ ${totalAmount.toFixed(2)}`);
     
     return {
       id: String(order.id || `order_${index}`),
       type: 'order',
-      status: realStatus, // STATUS CORRIGIDO
-      amount: totalAmount, // VALOR TOTAL CORRETO
-      fee: totalFee,
+      status: order.status || charge.status || 'unknown',
+      // CORREÇÃO: Valores em centavos convertidos para reais
+      amount: (Number(order.amount) || 0) / 100,
+      fee: (Number(charge.fee) || Number(charge.transaction?.fee) || 0) / 100,
       created_at: order.created_at || new Date().toISOString(),
-      description: `Pedido ${order.code || extractRealTransactionCode(order)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'} - ${realStatus.toUpperCase()}`,
+      description: `Pedido ${order.code || extractRealTransactionCode(order)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       
-      // Dados completos extraídos
+      // Dados COMPLETOS extraídos
       ...detailedData,
       
       // Dados específicos do order
-      transaction_id: charge.id || charge.last_transaction?.id,
+      transaction_id: charge.id || charge.transaction?.id,
       order_id: order.id,
       customer: customer,
       billing: order.billing,
-      real_code: order.code || extractRealTransactionCode(order),
-      
-      // Informações adicionais para debug
-      original_order_status: order.status,
-      original_charge_status: charge.status,
-      payment_date: order.paid_at || charge.paid_at
+      real_code: order.code || extractRealTransactionCode(order)
     };
   }).filter(Boolean);
 };
 
-// AJUSTE: Mapear payables APENAS quando necessário (recebíveis futuros)
+// Mapear payables para operações com EXTRAÇÃO COMPLETA
 export const mapPayablesToOperations = (payablesData: any[]): any[] => {
-  console.log('🔄 [MAPEAMENTO] Processando payables (recebíveis futuros)...');
-  
   return payablesData
     .filter((payable: any) => {
       const paymentMethod = payable.payment_method;
-      // Só incluir payables que são realmente recebíveis futuros
-      return (paymentMethod === 'pix' || paymentMethod === 'credit_card') && 
-             payable.status === 'waiting_funds'; // Apenas os que ainda estão aguardando
+      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
     })
     .map((payable: any) => {
+      // Extrair TODOS os dados detalhados
       const detailedData = extractDetailedData(payable, 'payable');
       
       return {
         id: String(payable.id),
         type: 'payable',
-        status: 'waiting_funds', // Status específico para recebíveis
+        status: payable.status || 'unknown',
+        // CORREÇÃO: Valores em centavos convertidos para reais
         amount: (Number(payable.amount) || 0) / 100,
         fee: (Number(payable.fee) || 0) / 100,
         created_at: payable.created_at || new Date().toISOString(),
-        description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão'} - Aguardando`,
+        description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
         
-        // Dados completos extraídos
+        // Dados COMPLETOS extraídos
         ...detailedData,
         
         // Dados específicos dos payables
@@ -236,7 +163,7 @@ export const mapPayablesToOperations = (payablesData: any[]): any[] => {
     });
 };
 
-// Mapear transações diretas
+// Mapear transações com EXTRAÇÃO COMPLETA
 export const mapTransactions = (transactionsData: any[]): any[] => {
   return transactionsData
     .filter((transaction: any) => {
@@ -244,24 +171,20 @@ export const mapTransactions = (transactionsData: any[]): any[] => {
       return paymentMethod === 'pix' || paymentMethod === 'credit_card';
     })
     .map((transaction: any) => {
+      // Extrair TODOS os dados detalhados
       const detailedData = extractDetailedData(transaction, 'transaction');
-      
-      // Determinar status real da transação
-      let realStatus = transaction.status || 'unknown';
-      if (transaction.status === 'authorized') {
-        realStatus = 'paid'; // Transação autorizada = paga
-      }
       
       return {
         id: String(transaction.id),
+        // CORREÇÃO: Valores em centavos convertidos para reais
         amount: (Number(transaction.amount) || 0) / 100,
-        status: realStatus,
+        status: transaction.status || 'unknown',
         payment_method: transaction.payment_method || 'unknown',
         created_at: transaction.created_at || new Date().toISOString(),
         paid_at: transaction.paid_at,
         fee: (Number(transaction.fee) || 0) / 100,
         
-        // Dados completos extraídos
+        // Dados COMPLETOS extraídos
         ...detailedData,
         
         // Dados específicos das transações

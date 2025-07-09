@@ -13,10 +13,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     refused: { label: 'Recusado', variant: 'destructive' },
     pending: { label: 'Pendente', variant: 'outline' },
     available: { label: 'Disponível', variant: 'default' },
-    waiting_funds: { label: 'Recebível Futuro', variant: 'secondary' }, // Atualizado
+    waiting_funds: { label: 'Aguardando', variant: 'secondary' },
     transferred: { label: 'Transferido', variant: 'outline' },
     refunded: { label: 'Estornado', variant: 'destructive' },
-    authorized: { label: 'Autorizado/Pago', variant: 'default' }, // Adicionado
   };
 
   const statusInfo = statusMap[status] || { label: status, variant: 'outline' };

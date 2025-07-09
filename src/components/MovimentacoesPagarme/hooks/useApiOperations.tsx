@@ -1,4 +1,3 @@
-
 /**
  * Hook para operações da API Pagar.me
  * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO E PERSISTÊNCIA NO SUPABASE
@@ -8,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BalanceOperation, Transaction } from '../types';
 import { getMockOperations, getMockTransactions } from '../mockData';
 import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
-import { testConnection, fetchAllData } from '../services/pagarmeService';
+import { testConnection, fetchAllDataWithBalance } from '../services/pagarmeService';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
 
@@ -281,7 +280,8 @@ export const useApiOperations = ({
         setProgressInfo({ stage, current, total, info });
       };
 
-      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey, onProgress);
+      // Use the combined service function that includes balance data
+      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllDataWithBalance(apiKey, onProgress);
       
       console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
         ordersRaw: ordersData.length,

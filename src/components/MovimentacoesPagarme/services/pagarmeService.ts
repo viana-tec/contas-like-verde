@@ -9,6 +9,10 @@ export { makeApiRequest, testConnection, fetchTransactionDetails } from './apiCl
 export { fetchAllDataUnlimited, fetchAllData } from './dataCollector';
 export { fetchBalance } from './balanceService';
 
+// Import the functions we need for the main service
+import { fetchAllData } from './dataCollector';
+import { fetchBalance } from './balanceService';
+
 // Main service function that combines all operations
 export const fetchAllDataWithBalance = async (
   apiKey: string,

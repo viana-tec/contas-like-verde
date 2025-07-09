@@ -9,9 +9,12 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const statusMap: Record<string, { label: string; variant: any }> = {
     paid: { label: 'Pago', variant: 'default' },
+    authorized: { label: 'Pago', variant: 'default' },
     processing: { label: 'Processando', variant: 'secondary' },
     refused: { label: 'Recusado', variant: 'destructive' },
     pending: { label: 'Pendente', variant: 'outline' },
+    pending_payment: { label: 'Pendente', variant: 'outline' },
+    waiting_payment: { label: 'Pendente', variant: 'outline' },
     available: { label: 'Disponível', variant: 'default' },
     waiting_funds: { label: 'Aguardando', variant: 'secondary' },
     transferred: { label: 'Transferido', variant: 'outline' },

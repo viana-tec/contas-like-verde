@@ -9,6 +9,8 @@ import { BalanceOperation, Transaction } from '../types';
 import { getMockOperations, getMockTransactions } from '../mockData';
 import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
 import { testConnection, fetchAllData } from '../services/pagarmeService';
+import { mergeOperationsWithoutDuplicates } from '../utils/operationMerger';
+import { deduplicateOperations, validateOperationIntegrity } from '../utils/operationDeduplicator';
 import { useState } from 'react';
 
 interface UseApiOperationsProps {
@@ -185,8 +187,17 @@ export const useApiOperations = ({
       const orderOperations = mapOrdersToOperations(ordersData);
       const payableOperations = mapPayablesToOperations(payablesData);
       
-      // Combinar todas as operações
-      const allOperations = [...orderOperations, ...payableOperations];
+      // Combinar operações evitando duplicatas por código
+      const mergedOperations = mergeOperationsWithoutDuplicates(orderOperations, payableOperations);
+      
+      // Aplicar deduplicação final para garantir integridade
+      const allOperations = deduplicateOperations(mergedOperations);
+      
+      // Validar integridade dos dados
+      const integrity = validateOperationIntegrity(allOperations);
+      if (!integrity.isValid) {
+        console.warn('⚠️ [FRONTEND] Problemas de integridade encontrados:', integrity);
+      }
       
       // Converter transações
       const formattedTransactions = mapTransactions(transactionsData);

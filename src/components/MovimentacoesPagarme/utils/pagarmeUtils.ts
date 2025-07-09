@@ -105,10 +105,22 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
     // Extrair TODOS os dados detalhados
     const detailedData = extractDetailedData(charge, 'order');
     
+    // Status correto: priorizar status do order principal
+    let correctStatus = order.status || charge.status || 'unknown';
+    
+    // Mapear status específicos para cartão de crédito
+    if (paymentMethod === 'credit_card') {
+      if (correctStatus === 'paid' || correctStatus === 'authorized') {
+        correctStatus = 'paid';
+      } else if (correctStatus === 'pending_payment' || correctStatus === 'waiting_payment') {
+        correctStatus = 'pending';
+      }
+    }
+    
     return {
       id: String(order.id || `order_${index}`),
       type: 'order',
-      status: order.status || charge.status || 'unknown',
+      status: correctStatus,
       // CORREÇÃO: Valores em centavos convertidos para reais
       amount: (Number(order.amount) || 0) / 100,
       fee: (Number(charge.fee) || Number(charge.transaction?.fee) || 0) / 100,
@@ -128,39 +140,72 @@ export const mapOrdersToOperations = (ordersData: any[]): any[] => {
   }).filter(Boolean);
 };
 
-// Mapear payables para operações com EXTRAÇÃO COMPLETA
+// Mapear payables para operações com EXTRAÇÃO COMPLETA E AGRUPAMENTO POR TRANSAÇÃO
 export const mapPayablesToOperations = (payablesData: any[]): any[] => {
-  return payablesData
-    .filter((payable: any) => {
-      const paymentMethod = payable.payment_method;
-      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
-    })
-    .map((payable: any) => {
-      // Extrair TODOS os dados detalhados
-      const detailedData = extractDetailedData(payable, 'payable');
+  // Primeiro, filtrar apenas PIX e cartão de crédito
+  const filteredPayables = payablesData.filter((payable: any) => {
+    const paymentMethod = payable.payment_method;
+    return paymentMethod === 'pix' || paymentMethod === 'credit_card';
+  });
+  
+  // Agrupar payables por charge_id/transaction_id para evitar duplicatas
+  const groupedPayables = new Map<string, any[]>();
+  
+  filteredPayables.forEach((payable: any) => {
+    const groupKey = payable.charge_id || payable.transaction_id || payable.id;
+    if (!groupedPayables.has(groupKey)) {
+      groupedPayables.set(groupKey, []);
+    }
+    groupedPayables.get(groupKey)!.push(payable);
+  });
+  
+  // Processar cada grupo
+  return Array.from(groupedPayables.entries()).map(([groupKey, payables]) => {
+    // Usar o primeiro payable como base
+    const basePayable = payables[0];
+    
+    // Somar valores de todas as parcelas
+    const totalAmount = payables.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalFee = payables.reduce((sum, p) => sum + (Number(p.fee) || 0), 0);
+    
+    // Extrair dados detalhados
+    const detailedData = extractDetailedData(basePayable, 'payable');
+    
+    // Para cartão de crédito, ajustar status baseado no conjunto de payables
+    let correctStatus = basePayable.status || 'unknown';
+    if (basePayable.payment_method === 'credit_card') {
+      // Se todos os payables estão pagos, marcar como pago
+      const allPaid = payables.every(p => p.status === 'paid' || p.status === 'available');
+      if (allPaid) {
+        correctStatus = 'paid';
+      } else {
+        correctStatus = 'pending';
+      }
+    }
+    
+    return {
+      id: String(basePayable.id),
+      type: 'payable',
+      status: correctStatus,
+      // CORREÇÃO: Valores em centavos convertidos para reais e somados
+      amount: totalAmount / 100,
+      fee: totalFee / 100,
+      created_at: basePayable.created_at || new Date().toISOString(),
+      description: `Recebível ${basePayable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}${payables.length > 1 ? ` (${payables.length} parcelas)` : ''}`,
       
-      return {
-        id: String(payable.id),
-        type: 'payable',
-        status: payable.status || 'unknown',
-        // CORREÇÃO: Valores em centavos convertidos para reais
-        amount: (Number(payable.amount) || 0) / 100,
-        fee: (Number(payable.fee) || 0) / 100,
-        created_at: payable.created_at || new Date().toISOString(),
-        description: `Recebível ${payable.payment_method === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
-        
-        // Dados COMPLETOS extraídos
-        ...detailedData,
-        
-        // Dados específicos dos payables
-        charge_id: payable.charge_id,
-        recipient_id: payable.recipient_id,
-        payment_date: payable.payment_date,
-        anticipation_fee: (Number(payable.anticipation_fee) || 0) / 100,
-        fraud_coverage_fee: (Number(payable.fraud_coverage_fee) || 0) / 100,
-        real_code: extractRealTransactionCode(payable)
-      };
-    });
+      // Dados COMPLETOS extraídos
+      ...detailedData,
+      
+      // Dados específicos dos payables
+      charge_id: basePayable.charge_id,
+      recipient_id: basePayable.recipient_id,
+      payment_date: basePayable.payment_date,
+      anticipation_fee: payables.reduce((sum, p) => sum + (Number(p.anticipation_fee) || 0), 0) / 100,
+      fraud_coverage_fee: payables.reduce((sum, p) => sum + (Number(p.fraud_coverage_fee) || 0), 0) / 100,
+      real_code: extractRealTransactionCode(basePayable),
+      installments: payables.length // Número de parcelas
+    };
+  });
 };
 
 // Mapear transações com EXTRAÇÃO COMPLETA

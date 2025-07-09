@@ -33,12 +33,11 @@ export const Sidebar: React.FC = () => {
     <div className="w-64 bg-[#1a1a1a] border-r border-gray-800 h-screen flex flex-col">
       {/* Logo */}
       <div className="p-4 sm:p-6 border-b border-gray-800">
-        <div className="flex items-center justify-center">
-          <img 
-            src="/lovable-uploads/ccbb80c9-03c4-4630-8c16-9889a9f6c1be.png" 
-            alt="Finance Logo" 
-            className="h-12 w-auto"
-          />
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-[#39FF14] rounded-lg flex items-center justify-center">
+            <DollarSign size={20} className="text-black" />
+          </div>
+          <span className="text-lg sm:text-xl font-bold text-white">FinanceApp</span>
         </div>
       </div>
 

@@ -1,17 +1,19 @@
 
 /**
- * Hook para operações da API Pagar.me
- * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
+ * Hook para operações da API Pagar.me com progresso detalhado
  */
 
-import { useToast } from '@/hooks/use-toast';
-import { BalanceOperation, Transaction } from '../types';
-import { getMockOperations, getMockTransactions } from '../mockData';
-import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOperations } from '../utils/pagarmeUtils';
-import { testConnection, fetchAllData } from '../services/pagarmeService';
-import { mergeOperationsWithoutDuplicates } from '../utils/operationMerger';
-import { deduplicateOperations, validateOperationIntegrity } from '../utils/operationDeduplicator';
 import { useState } from 'react';
+import { BalanceOperation, Transaction, ConnectionStatus } from '../types';
+import { 
+  fetchPagarmeBalance, 
+  fetchPagarmeOperations, 
+  fetchPagarmeTransactions,
+  testPagarmeConnection 
+} from '../services/pagarmeService';
+import { generateMockOperations, generateMockTransactions } from '../mockData';
+import { mergeOperations } from '../utils/operationMerger';
+import { deduplicateOperations } from '../utils/operationDeduplicator';
 
 interface UseApiOperationsProps {
   apiKey: string;
@@ -20,8 +22,16 @@ interface UseApiOperationsProps {
   setAvailableBalance: (balance: number) => void;
   setPendingBalance: (balance: number) => void;
   setLoading: (loading: boolean) => void;
-  setConnectionStatus: (status: any) => void;
-  setErrorDetails: (details: string) => void;
+  setConnectionStatus: (status: ConnectionStatus, error?: string) => Promise<void>;
+  setErrorDetails: (error: string) => void;
+  saveApiKey: (apiKey: string, status?: ConnectionStatus, error?: string) => Promise<boolean>;
+}
+
+interface ProgressInfo {
+  stage: string;
+  current: number;
+  total: number;
+  info: string;
 }
 
 export const useApiOperations = ({
@@ -32,221 +42,149 @@ export const useApiOperations = ({
   setPendingBalance,
   setLoading,
   setConnectionStatus,
-  setErrorDetails
+  setErrorDetails,
+  saveApiKey
 }: UseApiOperationsProps) => {
-  const { toast } = useToast();
-  
-  // Estado para progresso detalhado
-  const [progressInfo, setProgressInfo] = useState<{
-    stage: string;
-    current: number;
-    total: number;
-    info: string;
-  } | null>(null);
+  const [progressInfo, setProgressInfo] = useState<ProgressInfo | undefined>();
 
-  const saveApiKey = () => {
+  const updateProgress = (stage: string, current: number, total: number, info: string) => {
+    setProgressInfo({ stage, current, total, info });
+  };
+
+  const saveApiKeyAndTest = async () => {
     if (!apiKey.trim()) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira uma chave API.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateApiKey(apiKey)) {
-      toast({
-        title: "Formato inválido", 
-        description: "A chave da API deve ter pelo menos 10 caracteres válidos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    localStorage.setItem('pagarme_api_key', apiKey.trim());
-    setConnectionStatus('idle');
-    setErrorDetails('');
-    
-    toast({
-      title: "Chave API salva",
-      description: "A chave da API foi salva com sucesso.",
-    });
-  };
-
-  const handleTestConnection = async () => {
-    if (!apiKey?.trim()) {
-      toast({
-        title: "Erro",
-        description: "Configure sua chave da API primeiro.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateApiKey(apiKey)) {
-      toast({
-        title: "Formato inválido",
-        description: "Chave da API em formato inválido.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setConnectionStatus('connecting');
-    setErrorDetails('');
-    setProgressInfo({ stage: 'Testando conexão', current: 1, total: 2, info: 'Verificando API...' });
-    
-    try {
-      await testConnection(apiKey);
-      
-      setConnectionStatus('connected');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Conexão estabelecida",
-        description: "API Pagar.me conectada com sucesso!",
-      });
-      
-      // Buscar dados após conectar
-      await fetchData();
-      
-    } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro conexão:', error);
-      setConnectionStatus('error');
-      setErrorDetails(error.message || 'Erro desconhecido');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Erro de conexão",
-        description: error.message || 'Não foi possível conectar',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadDemoData = () => {
-    console.log('📊 [FRONTEND] Carregando demo...');
-    
-    try {
-      const mockOperations = getMockOperations();
-      const mockTransactions = getMockTransactions();
-
-      setOperations(mockOperations);
-      setTransactions(mockTransactions);
-      setAvailableBalance(125430.50);
-      setPendingBalance(45670.25);
-      setConnectionStatus('connected');
-      setErrorDetails('');
-
-      toast({
-        title: "Dados demo carregados",
-        description: `${mockOperations.length} operações e ${mockTransactions.length} transações.`,
-      });
-    } catch (error) {
-      console.error('❌ Erro ao carregar demo:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados demo",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchData = async () => {
-    if (!apiKey?.trim() || !validateApiKey(apiKey)) {
-      toast({
-        title: "Erro",
-        description: "Chave API inválida.",
-        variant: "destructive",
-      });
+      setErrorDetails('Chave API é obrigatória');
       return;
     }
 
     setLoading(true);
-    setErrorDetails('');
-    setProgressInfo({ stage: 'Iniciando coleta', current: 0, total: 4, info: 'Preparando...' });
-    
-    try {
-      // Função de callback para atualizar progresso
-      const onProgress = (stage: string, current: number, total: number, info: string) => {
-        setProgressInfo({ stage, current, total, info });
-      };
+    updateProgress('Salvando configuração...', 1, 2, 'Salvando chave API no banco de dados');
 
-      const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey, onProgress);
-      
-      console.log(`🔄 [FRONTEND] Processando dados recebidos:`, {
-        ordersRaw: ordersData.length,
-        payablesRaw: payablesData.length,
-        transactionsRaw: transactionsData.length,
-        balance: balanceData
-      });
-      
-      setProgressInfo({ stage: 'Processando dados', current: 4, total: 4, info: 'Formatando operações...' });
-      
-      // Mapear orders para operações E payables para operações também 
-      const orderOperations = mapOrdersToOperations(ordersData);
-      const payableOperations = mapPayablesToOperations(payablesData);
-      
-      // Combinar operações evitando duplicatas por código
-      const mergedOperations = mergeOperationsWithoutDuplicates(orderOperations, payableOperations);
-      
-      // Aplicar deduplicação final para garantir integridade
-      const allOperations = deduplicateOperations(mergedOperations);
-      
-      // Validar integridade dos dados
-      const integrity = validateOperationIntegrity(allOperations);
-      if (!integrity.isValid) {
-        console.warn('⚠️ [FRONTEND] Problemas de integridade encontrados:', integrity);
+    try {
+      const success = await saveApiKey(apiKey, 'idle');
+      if (!success) {
+        throw new Error('Erro ao salvar configuração no banco');
       }
-      
-      // Converter transações
-      const formattedTransactions = mapTransactions(transactionsData);
-      
-      // Atualizar estados
-      setOperations(allOperations);
-      setTransactions(formattedTransactions);
-      setAvailableBalance(balanceData.available);
-      setPendingBalance(balanceData.pending);
-      
-      console.log(`🎯 [FRONTEND] DADOS PROCESSADOS COM SUCESSO:`, {
-        totalOperations: allOperations.length,
-        orderOperations: orderOperations.length,
-        payableOperations: payableOperations.length,
-        formattedTransactions: formattedTransactions.length,
-        saldoDisponivel: balanceData.available,
-        saldoPendente: balanceData.pending,
-        sampleOperation: allOperations[0],
-        sampleTransaction: formattedTransactions[0]
-      });
-      
-      setProgressInfo(null);
-      
-      toast({
-        title: "🎉 Dados carregados com sucesso!",
-        description: `${allOperations.length} operações e ${formattedTransactions.length} transações coletadas!`,
-      });
-      
+
+      updateProgress('Testando conexão...', 2, 2, 'Verificando conectividade com a API');
+      await testConnection();
     } catch (error: any) {
-      console.error('❌ [FRONTEND] Erro buscar dados:', error);
-      setErrorDetails(error.message || 'Erro ao buscar dados');
-      setConnectionStatus('error');
-      setProgressInfo(null);
-      
-      toast({
-        title: "Erro ao carregar",
-        description: error.message || 'Erro desconhecido',
-        variant: "destructive",
-      });
+      console.error('Erro ao salvar chave:', error);
+      await setConnectionStatus('error', error.message || 'Erro ao salvar configuração');
     } finally {
       setLoading(false);
+      setProgressInfo(undefined);
+    }
+  };
+
+  const testConnection = async () => {
+    if (!apiKey) {
+      setErrorDetails('Configure uma chave API primeiro');
+      return;
+    }
+
+    setLoading(true);
+    await setConnectionStatus('connecting');
+    updateProgress('Testando API...', 1, 1, 'Verificando autenticação');
+
+    try {
+      const isValid = await testPagarmeConnection(apiKey);
+      
+      if (isValid) {
+        await setConnectionStatus('connected');
+        await saveApiKey(apiKey, 'connected');
+        console.log('✅ Conexão estabelecida com sucesso');
+      } else {
+        throw new Error('Chave API inválida ou sem permissões');
+      }
+    } catch (error: any) {
+      console.error('❌ Erro no teste de conexão:', error);
+      await setConnectionStatus('error', error.message);
+      await saveApiKey(apiKey, 'error', error.message);
+    } finally {
+      setLoading(false);
+      setProgressInfo(undefined);
+    }
+  };
+
+  const loadDemoData = async () => {
+    setLoading(true);
+    await setConnectionStatus('connecting');
+    updateProgress('Carregando dados demo...', 1, 3, 'Gerando operações de exemplo');
+
+    try {
+      // Simular delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateProgress('Processando operações...', 2, 3, 'Organizando dados demo');
+      const mockOperations = generateMockOperations();
+      const mockTransactions = generateMockTransactions();
+      
+      updateProgress('Finalizando...', 3, 3, 'Aplicando dados demo');
+      setOperations(mockOperations);
+      setTransactions(mockTransactions);
+      setAvailableBalance(125450.89);
+      setPendingBalance(23567.12);
+      
+      await setConnectionStatus('connected');
+      console.log('✅ Dados demo carregados');
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar demo:', error);
+      await setConnectionStatus('error', error.message);
+    } finally {
+      setLoading(false);
+      setProgressInfo(undefined);
+    }
+  };
+
+  const fetchData = async () => {
+    if (!apiKey) {
+      setErrorDetails('Configure uma chave API primeiro');
+      return;
+    }
+
+    setLoading(true);
+    await setConnectionStatus('connecting');
+
+    try {
+      // Buscar saldo
+      updateProgress('Buscando saldo...', 1, 4, 'Consultando saldo disponível');
+      const balanceData = await fetchPagarmeBalance(apiKey);
+      setAvailableBalance(balanceData.available / 100);
+      setPendingBalance(balanceData.pending / 100);
+
+      // Buscar operações
+      updateProgress('Buscando operações...', 2, 4, 'Consultando operações de saldo');
+      const operationsData = await fetchPagarmeOperations(apiKey);
+      
+      updateProgress('Processando operações...', 3, 4, 'Organizando e mesclando dados');
+      const mergedOperations = mergeOperations(operationsData);
+      const deduplicatedOperations = deduplicateOperations(mergedOperations);
+      setOperations(deduplicatedOperations);
+
+      // Buscar transações
+      updateProgress('Buscando transações...', 4, 4, 'Consultando histórico de transações');
+      const transactionsData = await fetchPagarmeTransactions(apiKey);
+      setTransactions(transactionsData);
+
+      await setConnectionStatus('connected');
+      await saveApiKey(apiKey, 'connected');
+      console.log('✅ Dados carregados com sucesso');
+    } catch (error: any) {
+      console.error('❌ Erro ao buscar dados:', error);
+      await setConnectionStatus('error', error.message);
+      await saveApiKey(apiKey, 'error', error.message);
+    } finally {
+      setLoading(false);
+      setProgressInfo(undefined);
     }
   };
 
   return {
-    saveApiKey,
-    testConnection: handleTestConnection,
+    progressInfo,
+    saveApiKey: saveApiKeyAndTest,
+    testConnection,
     loadDemoData,
-    fetchData,
-    progressInfo
+    fetchData
   };
 };

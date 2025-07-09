@@ -1,85 +1,163 @@
 
 /**
- * Utilities for Pagar.me API integration
- * CORRIGIDO PARA PAYABLES
+ * Utilitários para processamento de dados do Pagar.me
+ * VERSÃO OTIMIZADA COM EXTRAÇÃO COMPLETA DE DADOS
  */
 
-import { BalanceOperation } from '../types';
-
-export const validateApiKey = (apiKey: string): boolean => {
-  if (!apiKey || typeof apiKey !== 'string') return false;
-  const trimmed = apiKey.trim();
-  return trimmed.length >= 10 && (trimmed.startsWith('sk_') || trimmed.startsWith('ak_'));
+// Validação da chave API
+export const validateApiKey = (key: string): boolean => {
+  if (!key || typeof key !== 'string') {
+    return false;
+  }
+  const cleanKey = key.trim();
+  return cleanKey.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(cleanKey);
 };
 
-// Função para mapear PAYABLES para operações de saldo COM TAXAS - CORRIGIDA
-export const mapChargesToOperations = (payables: any[]): BalanceOperation[] => {
-  console.log(`🔄 [MAPPER] Mapeando ${payables.length} payables para operações...`);
+// Função OTIMIZADA para extrair código numérico real da transação/pedido
+export const extractRealTransactionCode = (item: any): string => {
+  // PRIORIDADE 1: Código do pedido/order (como 45812, 45811)
+  if (item.code && typeof item.code === 'string') {
+    // Se for numérico, usar direto
+    if (/^\d+$/.test(item.code)) {
+      return item.code;
+    }
+  }
   
-  const operations = payables.map((payable): BalanceOperation => {
-    // Calcular taxa (fee) corretamente dos payables
-    let fee = 0;
+  // PRIORIDADE 2: Reference key numérico
+  if (item.reference_key && /^\d+$/.test(item.reference_key)) {
+    return item.reference_key;
+  }
+  
+  // PRIORIDADE 3: Gateway ID se for numérico
+  if (item.gateway_id && /^\d+$/.test(String(item.gateway_id))) {
+    return String(item.gateway_id);
+  }
+  
+  // PRIORIDADE 4: Extrair números do ID (para ch_XXXXX extrair parte numérica)
+  const idStr = String(item.id || '');
+  const numericPart = idStr.replace(/[^0-9]/g, '');
+  
+  if (numericPart.length >= 4) {
+    return numericPart.substring(0, 6);
+  }
+  
+  // Fallback: gerar código sequencial baseado no timestamp
+  const timestamp = Date.now();
+  return String(timestamp).slice(-5);
+};
+
+// Função para extrair TODOS os dados detalhados de uma transação/operação
+const extractDetailedData = (item: any, source: string = 'unknown') => {
+  // Dados do cartão (aninhados ou diretos)
+  const card = item.card || item.last_transaction?.card || {};
+  
+  // Dados da transação (podem estar aninhados)
+  const transaction = item.last_transaction || item.transaction || item;
+  
+  // Dados do charge (para orders)
+  const charge = item.charges?.[0] || item;
+  
+  return {
+    // Dados básicos CORRIGIDOS
+    payment_method: item.payment_method || charge.payment_method || transaction.payment_method || 'unknown',
+    installments: Number(item.installments) || Number(charge.installments) || Number(transaction.installments) || 1,
     
-    // Nos payables, a taxa geralmente está em 'fee' ou pode ser calculada
-    if (payable.fee) {
-      fee = typeof payable.fee === 'number' ? payable.fee : parseFloat(payable.fee) || 0;
-    } else if (payable.anticipation_fee) {
-      fee = typeof payable.anticipation_fee === 'number' ? payable.anticipation_fee : parseFloat(payable.anticipation_fee) || 0;
-    } else if (payable.amount && payable.net_amount) {
-      // Calcular fee como diferença entre amount e net_amount
-      const amount = typeof payable.amount === 'number' ? payable.amount : parseFloat(payable.amount) || 0;
-      const netAmount = typeof payable.net_amount === 'number' ? payable.net_amount : parseFloat(payable.net_amount) || 0;
-      fee = amount - netAmount;
+    // Dados do adquirente
+    acquirer_name: item.acquirer_name || charge.acquirer_name || transaction.acquirer_name,
+    acquirer_response_code: item.acquirer_response_code || charge.acquirer_response_code || transaction.acquirer_response_code,
+    
+    // Códigos de autorização
+    authorization_code: item.authorization_code || charge.authorization_code || transaction.authorization_code,
+    tid: item.tid || charge.tid || transaction.tid,
+    nsu: item.nsu || charge.nsu || transaction.nsu,
+    
+    // Dados do cartão
+    card_brand: card.brand || item.card_brand || charge.card_brand || transaction.card_brand,
+    card_last_four_digits: card.last_four_digits || item.card_last_four_digits || charge.card_last_four_digits || transaction.card_last_four_digits,
+    
+    // Dados técnicos
+    soft_descriptor: item.soft_descriptor || charge.soft_descriptor || transaction.soft_descriptor,
+    gateway_response_time: item.gateway_response_time || charge.gateway_response_time || transaction.gateway_response_time,
+    antifraud_score: item.antifraud_score || charge.antifraud_score || transaction.antifraud_score,
+    
+    // Dados adicionais
+    gateway_id: item.gateway_id || charge.gateway_id || transaction.gateway_id,
+    reference_key: item.reference_key || charge.reference_key || transaction.reference_key,
+    
+    // Metadata
+    source,
+    extracted_at: new Date().toISOString()
+  };
+};
+
+// Mapear charges para operações com EXTRAÇÃO COMPLETA
+export const mapChargesToOperations = (chargesData: any[]): any[] => {
+  return chargesData.map((charge: any, index: number) => {
+    const customer = charge.customer || {};
+    
+    // Filtrar apenas PIX e cartão de crédito
+    const paymentMethod = charge.payment_method;
+    if (!paymentMethod || (paymentMethod !== 'pix' && paymentMethod !== 'credit_card')) {
+      return null;
     }
     
-    // Converter valores de centavos para reais
-    const amount = typeof payable.amount === 'number' ? payable.amount / 100 : parseFloat(payable.amount) / 100 || 0;
-    const feeInReais = fee > 0 ? fee / 100 : 0;
-    
-    console.log(`💰 [PAYABLE] ${payable.id}: R$ ${amount.toFixed(2)} (Taxa: R$ ${feeInReais.toFixed(2)})`);
-    
-    // Extrair informações da transação relacionada
-    const transaction = payable.transaction || {};
-    const charge = transaction.charge || payable.charge || {};
+    // Extrair TODOS os dados detalhados
+    const detailedData = extractDetailedData(charge, 'charge');
     
     return {
-      id: payable.id,
-      type: payable.type || 'payable',
-      status: payable.status || 'unknown',
-      amount: amount,
-      fee: feeInReais, // TAXA CORRETAMENTE CALCULADA
-      created_at: payable.date_created || payable.created_at || new Date().toISOString(),
-      updated_at: payable.date_updated || payable.updated_at || new Date().toISOString(),
-      description: `Recebível ${payable.id} - ${payable.type || 'credit'}`,
+      id: String(charge.id || `charge_${index}`),
+      type: 'charge',
+      status: charge.status || 'unknown',
+      // CORREÇÃO: Valores em centavos convertidos para reais
+      amount: (Number(charge.amount) || 0) / 100,
+      fee: (Number(charge.fee) || 0) / 100,
+      created_at: charge.created_at || new Date().toISOString(),
+      description: `Cobrança ${extractRealTransactionCode(charge)} - ${paymentMethod === 'pix' ? 'PIX' : 'Cartão de Crédito'}`,
       
-      // Campos de pagamento da transação
-      payment_method: transaction.payment_method || charge.payment_method || 'unknown',
-      installments: payable.installment || transaction.installments || 1,
+      // Dados COMPLETOS extraídos
+      ...detailedData,
       
-      // Campos da adquirente
-      acquirer_name: transaction.acquirer_name || 'unknown',
-      acquirer_response_code: transaction.acquirer_response_code,
-      authorization_code: transaction.authorization_code,
-      tid: transaction.tid,
-      nsu: transaction.nsu,
-      
-      // Campos do cartão
-      card_brand: transaction.card_brand || charge.card_brand,
-      card_last_four_digits: transaction.card_last_four_digits || charge.card_last_four_digits,
-      
-      // Campos adicionais
-      soft_descriptor: transaction.soft_descriptor,
-      gateway_response_time: transaction.gateway_response_time,
-      antifraud_score: transaction.antifraud_score,
-      
-      // Campos de referência do payable
-      real_code: payable.id,
-      reference_key: charge.reference_key || transaction.reference_key,
-      order_id: charge.order_id,
-      transaction_id: transaction.id
+      // Dados específicos do charge
+      charge_id: charge.id,
+      customer: customer,
+      billing: charge.billing,
+      real_code: extractRealTransactionCode(charge)
     };
-  });
-  
-  console.log(`✅ [MAPPER] ${operations.length} operações mapeadas com sucesso`);
-  return operations;
+  }).filter(Boolean);
+};
+
+// Função removida - agora usamos mapChargesToOperations
+
+// Mapear transações com EXTRAÇÃO COMPLETA
+export const mapTransactions = (transactionsData: any[]): any[] => {
+  return transactionsData
+    .filter((transaction: any) => {
+      const paymentMethod = transaction.payment_method;
+      return paymentMethod === 'pix' || paymentMethod === 'credit_card';
+    })
+    .map((transaction: any) => {
+      // Extrair TODOS os dados detalhados
+      const detailedData = extractDetailedData(transaction, 'transaction');
+      
+      return {
+        id: String(transaction.id),
+        // CORREÇÃO: Valores em centavos convertidos para reais
+        amount: (Number(transaction.amount) || 0) / 100,
+        status: transaction.status || 'unknown',
+        payment_method: transaction.payment_method || 'unknown',
+        created_at: transaction.created_at || new Date().toISOString(),
+        paid_at: transaction.paid_at,
+        fee: (Number(transaction.fee) || 0) / 100,
+        
+        // Dados COMPLETOS extraídos
+        ...detailedData,
+        
+        // Dados específicos das transações
+        customer: transaction.customer,
+        billing: transaction.billing,
+        boleto: transaction.boleto,
+        pix: transaction.pix,
+        real_code: extractRealTransactionCode(transaction)
+      };
+    });
 };

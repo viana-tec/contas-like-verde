@@ -2,12 +2,11 @@
 /**
  * Data collection service for massively collecting data from Pagar.me API
  * Handles pagination, progress tracking, and parallel collection
- * CORRIGIDO PARA USAR ENDPOINT CORRETO DE PAYABLES
  */
 
 import { makeApiRequest } from './apiClient';
 
-// Função para buscar dados com paginação MASSIVA E OTIMIZADA - ENDPOINT CORRETO
+// Função para buscar dados com paginação MASSIVA E OTIMIZADA
 export const fetchAllDataUnlimited = async (
   endpoint: string, 
   apiKey: string,
@@ -15,18 +14,18 @@ export const fetchAllDataUnlimited = async (
 ): Promise<any[]> => {
   let allData: any[] = [];
   let page = 1;
-  let pageSize = 100; // API v5 usa 'count' e max 100
-  let maxPages = 10000; // Aumentar ainda mais o limite para garantir coleta completa
+  let pageSize = 100; // API v5 usa 'size' e max 100
+  let maxPages = 5000; // Aumentar limite para coleta completa de charges
   let consecutiveEmptyPages = 0;
-  const maxConsecutiveEmpty = 5;
+  const maxConsecutiveEmpty = 3;
   
   console.log(`📄 [COLETA] Iniciando coleta MASSIVA v5: ${endpoint}`);
   
   while (page <= maxPages && consecutiveEmptyPages < maxConsecutiveEmpty) {
-    // API v5 de payables usa 'count' e 'page'
-    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}count=${pageSize}&page=${page}`;
+    // API v5 usa 'size' e 'page' (não 'count')
+    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}size=${pageSize}&page=${page}`;
     
-    onProgress?.(page, maxPages, `Coletando página ${page}... (${allData.length} registros)`);
+    onProgress?.(page, maxPages, `Coletando página ${page}...`);
     console.log(`📄 [COLETA] Página ${page}/${maxPages}: ${fullEndpoint}`);
     
     try {
@@ -91,56 +90,51 @@ export const fetchAllDataUnlimited = async (
   return allData;
 };
 
-// Função MASSIVA para buscar TODOS os payables (recebíveis) - ENDPOINT CORRETO
+// Função MASSIVA para buscar TODAS as charges (ch_) - VERSÃO FOCADA
 export const fetchAllData = async (
   apiKey: string, 
   onProgress?: (stage: string, current: number, total: number, info: string) => void
 ) => {
-  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE PAYABLES (recebíveis) - ENDPOINT CORRETO...');
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE CHARGES (ch_)...');
   
-  // Período estendido de 36 meses para capturar TODOS os dados históricos
-  const thirtyFiveMonthsAgo = new Date();
-  thirtyFiveMonthsAgo.setMonth(thirtyFiveMonthsAgo.getMonth() - 36);
-  const createdSince = thirtyFiveMonthsAgo.toISOString().split('T')[0];
+  // Período estendido de 24 meses para capturar TODOS os dados históricos
+  const twentyFourMonthsAgo = new Date();
+  twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+  const dateParam = twentyFourMonthsAgo.toISOString().split('T')[0];
   
-  // Data atual como limite
-  const today = new Date();
-  const createdUntil = today.toISOString().split('T')[0];
-  
-  console.log(`📅 [MASTER] Período: ${createdSince} até ${createdUntil} (36 meses)`);
+  console.log(`📅 [MASTER] Período: ${dateParam} até hoje (24 meses)`);
   
   try {
-    // FASE 1: Coleta MASSIVA usando ENDPOINT CORRETO de payables
-    console.log('🚀 [FASE 1] Iniciando coleta massiva de payables (recebíveis)...');
-    onProgress?.('Coletando payables', 1, 2, 'Iniciando coleta de todos os recebíveis...');
+    // FASE 1: Coleta MASSIVA focada SOMENTE em charges
+    console.log('🚀 [FASE 1] Iniciando coleta massiva de charges...');
+    onProgress?.('Coletando charges', 1, 2, 'Iniciando coleta de todas as charges...');
     
-    // USAR ENDPOINT CORRETO DE PAYABLES com filtros de data
-    const payablesEndpoint = `/core/v5/payables?created_since=${createdSince}&created_until=${createdUntil}`;
-    
-    console.log(`📡 [ENDPOINT CORRETO] ${payablesEndpoint}`);
-    
-    const payablesData = await fetchAllDataUnlimited(payablesEndpoint, apiKey, (current, total, info) => {
-      onProgress?.('Coletando payables', 1, 2, `Payables: ${info}`);
+    const chargesEndpoint = `/core/v5/charges?created_since=${dateParam}`;
+    const chargesData = await fetchAllDataUnlimited(chargesEndpoint, apiKey, (current, total, info) => {
+      onProgress?.('Coletando charges', 1, 2, `Charges: ${info}`);
     });
     
-    console.log(`📊 [FASE 1] Coleta de payables completa: ${payablesData.length} payables`);
+    console.log(`📊 [FASE 1] Coleta de charges completa: ${chargesData.length} charges`);
     
-    // FASE 2: Processar dados recebidos
-    console.log('🚀 [FASE 2] Processando payables recebidos...');
-    onProgress?.('Processando dados', 2, 2, 'Processando recebíveis...');
+    // FASE 2: Filtrar somente charges que começam com 'ch_'
+    console.log('🚀 [FASE 2] Filtrando charges válidas (ch_)...');
+    onProgress?.('Processando dados', 2, 2, 'Filtrando charges válidas...');
+    
+    const validCharges = chargesData.filter(charge => 
+      charge.id && charge.id.startsWith('ch_')
+    );
     
     const finalStats = {
-      totalPayables: payablesData.length,
-      filteredPayables: payablesData.length
+      totalCharges: chargesData.length,
+      validCharges: validCharges.length,
+      filtered: chargesData.length - validCharges.length
     };
     
     console.log(`🎯 [MASTER] COLETA FINALIZADA:`, finalStats);
-    console.log(`📋 [SAMPLE] Amostra de payable:`, payablesData[0]);
-    
-    onProgress?.('Concluído', 2, 2, `${finalStats.totalPayables} recebíveis coletados!`);
+    onProgress?.('Concluído', 2, 2, `${finalStats.validCharges} charges válidas coletadas!`);
 
     return {
-      payablesData: payablesData, // Todos os payables
+      payablesData: validCharges, // Somente charges válidas
       transactionsData: [], // Removido transações
       ordersData: [] // Removido orders
     };

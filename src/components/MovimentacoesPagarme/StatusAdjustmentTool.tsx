@@ -28,12 +28,22 @@ export const StatusAdjustmentTool: React.FC<StatusAdjustmentToolProps> = ({ oper
     
     const statusCounts: Record<string, number> = {};
     const suspiciousOperations: any[] = [];
+    const criticalOperations: any[] = [];
     
     operations.forEach(op => {
       // Contar status
       statusCounts[op.status] = (statusCounts[op.status] || 0) + 1;
       
-      // Encontrar operações suspeitas (cartão de crédito com status de aguardando)
+      // Operações críticas: cartões desde 08/07 com waiting_funds
+      const opDate = new Date(op.created_at);
+      const criticalDate = new Date('2025-07-08');
+      if (op.payment_method === 'credit_card' && 
+          op.status === 'waiting_funds' && 
+          opDate >= criticalDate) {
+        criticalOperations.push(op);
+      }
+      
+      // Operações suspeitas antigas: cartão de crédito com status de aguardando
       if (op.payment_method === 'credit_card' && 
           (op.status === 'waiting_payment' || op.status === 'pending')) {
         suspiciousOperations.push(op);
@@ -43,21 +53,26 @@ export const StatusAdjustmentTool: React.FC<StatusAdjustmentToolProps> = ({ oper
     const results = {
       totalOperations: operations.length,
       statusCounts,
+      criticalOperations: criticalOperations.slice(0, 10), // Primeiras 10
       suspiciousOperations: suspiciousOperations.slice(0, 10), // Primeiras 10
       recommendations: []
     };
     
     // Gerar recomendações
+    if (criticalOperations.length > 0) {
+      results.recommendations.push(`🚨 CRÍTICO: ${criticalOperations.length} operações de cartão desde 08/07 com status incorreto`);
+    }
     if (suspiciousOperations.length > 0) {
-      results.recommendations.push(`${suspiciousOperations.length} operações de cartão de crédito com status suspeito`);
+      results.recommendations.push(`⚠️ ${suspiciousOperations.length} operações antigas de cartão com status suspeito`);
     }
     
     console.log('🔍 [DIAGNOSTIC] Resultados:', results);
     setDiagnosticResults(results);
     
     toast({
-      title: "Diagnóstico concluído",
-      description: `Analisadas ${operations.length} operações`,
+      title: criticalOperations.length > 0 ? "🚨 Problema Crítico Detectado" : "Diagnóstico concluído",
+      description: `${criticalOperations.length + suspiciousOperations.length} operações com problemas`,
+      variant: criticalOperations.length > 0 ? "destructive" : "default"
     });
   };
 
@@ -106,38 +121,67 @@ export const StatusAdjustmentTool: React.FC<StatusAdjustmentToolProps> = ({ oper
 
   // Corrigir automaticamente operações suspeitas
   const autoFixSuspicious = async () => {
-    if (!diagnosticResults?.suspiciousOperations?.length) {
+    if (!diagnosticResults) {
+      toast({
+        title: "Execute o diagnóstico primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const criticalOps = diagnosticResults.criticalOperations || [];
+    const suspiciousOps = diagnosticResults.suspiciousOperations || [];
+    const totalToFix = criticalOps.length + suspiciousOps.length;
+
+    if (totalToFix === 0) {
       toast({
         title: "Nada para corrigir",
-        description: "Execute o diagnóstico primeiro",
-        variant: "destructive",
+        description: "Nenhuma operação problemática encontrada",
       });
       return;
     }
 
     setLoading(true);
     try {
-      console.log('🔧 [AUTO_FIX] Corrigindo operações suspeitas...');
+      console.log('🔧 [AUTO_FIX] Corrigindo operações...');
       
-      const updates = diagnosticResults.suspiciousOperations.map((op: any) => ({
-        external_id: op.external_id,
-        status: 'captured', // Assumir que cartão de crédito processado = captured
-        updated_at: new Date().toISOString()
-      }));
+      let fixedCount = 0;
 
-      for (const update of updates) {
-        await supabase
+      // Corrigir operações críticas (desde 08/07)
+      if (criticalOps.length > 0) {
+        const criticalUpdates = criticalOps.map((op: any) => op.external_id);
+        
+        const { error: criticalError } = await supabase
           .from('pagarme_operations')
           .update({ 
-            status: update.status,
-            updated_at: update.updated_at
+            status: 'captured',
+            updated_at: new Date().toISOString()
           })
-          .eq('external_id', update.external_id);
+          .in('external_id', criticalUpdates);
+
+        if (criticalError) throw criticalError;
+        fixedCount += criticalOps.length;
+      }
+
+      // Corrigir operações suspeitas antigas
+      if (suspiciousOps.length > 0) {
+        const suspiciousUpdates = suspiciousOps.map((op: any) => op.external_id);
+        
+        const { error: suspiciousError } = await supabase
+          .from('pagarme_operations')
+          .update({ 
+            status: 'captured',
+            updated_at: new Date().toISOString()
+          })
+          .in('external_id', suspiciousUpdates);
+
+        if (suspiciousError) throw suspiciousError;
+        fixedCount += suspiciousOps.length;
       }
 
       toast({
-        title: "Correção automática concluída",
-        description: `${updates.length} operações corrigidas`,
+        title: "✅ Correção automática concluída",
+        description: `${fixedCount} operações corrigidas (${criticalOps.length} críticas desde 08/07)`,
       });
 
       onRefresh();
@@ -181,8 +225,8 @@ export const StatusAdjustmentTool: React.FC<StatusAdjustmentToolProps> = ({ oper
                   <p className="text-lg font-bold text-white">{diagnosticResults.totalOperations}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Operações Suspeitas</p>
-                  <p className="text-lg font-bold text-yellow-400">{diagnosticResults.suspiciousOperations.length}</p>
+                  <p className="text-sm text-gray-400">Operações Críticas</p>
+                  <p className="text-lg font-bold text-red-400">{(diagnosticResults.criticalOperations || []).length}</p>
                 </div>
               </div>
               
@@ -197,22 +241,43 @@ export const StatusAdjustmentTool: React.FC<StatusAdjustmentToolProps> = ({ oper
                 </div>
               </div>
 
-              {diagnosticResults.suspiciousOperations.length > 0 && (
+              {((diagnosticResults.criticalOperations || []).length > 0 || (diagnosticResults.suspiciousOperations || []).length > 0) && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-yellow-400" />
-                    <p className="text-sm text-yellow-400">Operações Suspeitas (Cartão com status de aguardando):</p>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {diagnosticResults.suspiciousOperations.map((op: any) => (
-                      <div key={op.external_id} className="text-xs text-gray-300 p-2 bg-gray-700 rounded">
-                        ID: {op.external_id} | Status: {op.status} | Valor: R$ {op.amount.toFixed(2)}
+                  {(diagnosticResults.criticalOperations || []).length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={16} className="text-red-400" />
+                        <p className="text-sm text-red-400">🚨 Operações Críticas (Cartão desde 08/07 com waiting_funds):</p>
                       </div>
-                    ))}
-                  </div>
-                  <Button onClick={autoFixSuspicious} disabled={loading} className="w-full bg-yellow-600 hover:bg-yellow-700">
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {diagnosticResults.criticalOperations.map((op: any) => (
+                          <div key={op.external_id} className="text-xs text-gray-300 p-2 bg-red-900/20 rounded border border-red-600">
+                            ID: {op.external_id} | Status: {op.status} | Valor: R$ {op.amount.toFixed(2)} | Data: {new Date(op.created_at).toLocaleDateString('pt-BR')}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  
+                  {(diagnosticResults.suspiciousOperations || []).length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={16} className="text-yellow-400" />
+                        <p className="text-sm text-yellow-400">⚠️ Operações Suspeitas (Cartão com status antigo):</p>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {diagnosticResults.suspiciousOperations.map((op: any) => (
+                          <div key={op.external_id} className="text-xs text-gray-300 p-2 bg-yellow-900/20 rounded border border-yellow-600">
+                            ID: {op.external_id} | Status: {op.status} | Valor: R$ {op.amount.toFixed(2)}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  
+                  <Button onClick={autoFixSuspicious} disabled={loading} className="w-full bg-red-600 hover:bg-red-700">
                     {loading ? <RefreshCw size={16} className="animate-spin mr-2" /> : null}
-                    Corrigir Automaticamente
+                    Corrigir {((diagnosticResults.criticalOperations || []).length + (diagnosticResults.suspiciousOperations || []).length)} Operações
                   </Button>
                 </div>
               )}

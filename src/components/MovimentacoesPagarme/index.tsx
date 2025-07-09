@@ -13,6 +13,7 @@ import { EmptyState } from './EmptyState';
 import { BalanceCards } from './BalanceCards';
 import { ApiDiagnostics } from './ApiDiagnostics';
 import { StatusAdjustmentTool } from './StatusAdjustmentTool';
+import { ApiStatusSync } from './ApiStatusSync';
 import { usePagarmeApi } from './hooks/usePagarmeApi';
 
 export const MovimentacoesPagarme = () => {
@@ -109,6 +110,8 @@ export const MovimentacoesPagarme = () => {
           
           {/* Ferramenta de Ajuste de Status */}
           <StatusAdjustmentTool operations={operations} onRefresh={fetchData} />
+          
+          <ApiStatusSync onRefresh={fetchData} />
           
           <FilterPanel
             filters={filters}

@@ -1,7 +1,7 @@
 
 /**
  * Serviços para comunicação com a API do Pagar.me via Supabase Edge Function
- * VERSÃO OTIMIZADA COM COLETA MASSIVA ILIMITADA
+ * VERSÃO OTIMIZADA COM COLETA MASSIVA ILIMITADA E CORREÇÃO DE ENDPOINTS V5
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -201,8 +201,42 @@ export const fetchBalance = async (apiKey: string): Promise<{ available: number;
 // Função para testar conexão - API v5
 export const testConnection = async (apiKey: string): Promise<void> => {
   console.log('🔄 [TESTE] Testando conexão...');
-  const data = await makeApiRequest('/core/v5/payables?size=5', apiKey);
+  const data = await makeApiRequest('/core/v5/orders?size=5', apiKey);
   console.log('✅ [TESTE] Conexão OK:', data);
+};
+
+// Função para buscar detalhes de uma transação específica - API v5 CORRIGIDA
+export const fetchTransactionDetails = async (transactionId: string, apiKey: string): Promise<any> => {
+  console.log(`🔍 [TRANSACTION] Buscando detalhes de: ${transactionId}`);
+  
+  try {
+    // Primeiro, tentar buscar como charge
+    try {
+      const chargeData = await makeApiRequest(`/core/v5/charges/${transactionId}`, apiKey);
+      console.log(`✅ [TRANSACTION] Encontrado como charge: ${chargeData.status}`);
+      return chargeData;
+    } catch (chargeError) {
+      console.log(`⚠️ [TRANSACTION] Não encontrado como charge, tentando como order...`);
+    }
+    
+    // Se não encontrar como charge, tentar como order
+    try {
+      const orderData = await makeApiRequest(`/core/v5/orders/${transactionId}`, apiKey);
+      console.log(`✅ [TRANSACTION] Encontrado como order: ${orderData.status}`);
+      return orderData;
+    } catch (orderError) {
+      console.log(`⚠️ [TRANSACTION] Não encontrado como order, tentando como transaction...`);
+    }
+    
+    // Última tentativa: como transaction
+    const transactionData = await makeApiRequest(`/core/v5/transactions/${transactionId}`, apiKey);
+    console.log(`✅ [TRANSACTION] Encontrado como transaction: ${transactionData.status}`);
+    return transactionData;
+    
+  } catch (error) {
+    console.error(`❌ [TRANSACTION] Erro ao buscar ${transactionId}:`, error);
+    throw error;
+  }
 };
 
 // Função MASSIVA para buscar TODOS os dados de MÚLTIPLOS endpoints - VERSÃO DEFINITIVA
@@ -220,13 +254,13 @@ export const fetchAllData = async (
   console.log(`📅 [MASTER] Período: ${dateParam} até hoje (12 meses)`);
   
   try {
-    // FASE 1: Coleta PARALELA OTIMIZADA
+    // FASE 1: Coleta PARALELA OTIMIZADA com endpoints corretos v5
     console.log('🚀 [FASE 1] Iniciando coleta paralela otimizada...');
     onProgress?.('Coletando dados', 1, 4, 'Iniciando coleta de todos os endpoints...');
     
     const endpoints = [
-      { name: 'payables', url: `/core/v5/payables?created_since=${dateParam}` },
-      { name: 'orders', url: `/core/v5/orders?created_since=${dateParam}&status=paid,processing,waiting_payment` },
+      { name: 'orders', url: `/core/v5/orders?created_since=${dateParam}` },
+      { name: 'charges', url: `/core/v5/charges?created_since=${dateParam}` },
       { name: 'transactions', url: `/core/v5/transactions?created_since=${dateParam}` }
     ];
     
@@ -241,14 +275,14 @@ export const fetchAllData = async (
     );
     
     // Processar resultados
-    const payablesData = results[0].status === 'fulfilled' ? results[0].value.data : [];
-    const ordersData = results[1].status === 'fulfilled' ? results[1].value.data : [];
-    const directTransactionsData = results[2].status === 'fulfilled' ? results[2].value.data : [];
+    const ordersData = results[0].status === 'fulfilled' ? results[0].value.data : [];
+    const chargesData = results[1].status === 'fulfilled' ? results[1].value.data : [];
+    const transactionsData = results[2].status === 'fulfilled' ? results[2].value.data : [];
     
     console.log(`📊 [FASE 1] Coleta completa:`, {
-      payables: payablesData.length,
       orders: ordersData.length,
-      directTransactions: directTransactionsData.length
+      charges: chargesData.length,
+      transactions: transactionsData.length
     });
     
     // FASE 2: Processamento inteligente de transações
@@ -276,7 +310,8 @@ export const fetchAllData = async (
     onProgress?.('Consolidando', 4, 4, 'Finalizando processamento...');
     
     const allTransactionsData = [
-      ...directTransactionsData.map(t => ({ ...t, source: 'direct_transactions' })),
+      ...transactionsData.map(t => ({ ...t, source: 'direct_transactions' })),
+      ...chargesData.map(c => ({ ...c, source: 'direct_charges' })),
       ...orderTransactionsData
     ];
     
@@ -294,20 +329,20 @@ export const fetchAllData = async (
     const balanceData = await fetchBalance(apiKey);
     
     const finalStats = {
-      payables: payablesData.length,
       orders: ordersData.length,
-      directTransactions: directTransactionsData.length,
+      charges: chargesData.length,
+      directTransactions: transactionsData.length,
       orderTransactions: orderTransactionsData.length,
       uniqueTransactions: uniqueTransactions.length,
       balance: balanceData,
-      totalOperations: payablesData.length + ordersData.length
+      totalOperations: ordersData.length + chargesData.length
     };
     
     console.log(`🎯 [MASTER] COLETA DEFINITIVA FINALIZADA:`, finalStats);
     onProgress?.('Concluído', 4, 4, `${finalStats.totalOperations} operações coletadas!`);
 
     return {
-      payablesData,
+      payablesData: chargesData, // Na v5, charges substituem payables
       transactionsData: uniqueTransactions,
       ordersData,
       balanceData

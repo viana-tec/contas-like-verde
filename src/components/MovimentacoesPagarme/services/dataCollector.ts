@@ -2,11 +2,12 @@
 /**
  * Data collection service for massively collecting data from Pagar.me API
  * Handles pagination, progress tracking, and parallel collection
+ * CORRIGIDO PARA USAR ENDPOINT CORRETO DE PAYABLES
  */
 
 import { makeApiRequest } from './apiClient';
 
-// Função para buscar dados com paginação MASSIVA E OTIMIZADA
+// Função para buscar dados com paginação MASSIVA E OTIMIZADA - ENDPOINT CORRETO
 export const fetchAllDataUnlimited = async (
   endpoint: string, 
   apiKey: string,
@@ -14,7 +15,7 @@ export const fetchAllDataUnlimited = async (
 ): Promise<any[]> => {
   let allData: any[] = [];
   let page = 1;
-  let pageSize = 100; // API v5 usa 'size' e max 100
+  let pageSize = 100; // API v5 usa 'count' e max 100
   let maxPages = 10000; // Aumentar ainda mais o limite para garantir coleta completa
   let consecutiveEmptyPages = 0;
   const maxConsecutiveEmpty = 5;
@@ -22,8 +23,8 @@ export const fetchAllDataUnlimited = async (
   console.log(`📄 [COLETA] Iniciando coleta MASSIVA v5: ${endpoint}`);
   
   while (page <= maxPages && consecutiveEmptyPages < maxConsecutiveEmpty) {
-    // API v5 usa 'size' e 'page' (não 'count')
-    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}size=${pageSize}&page=${page}`;
+    // API v5 de payables usa 'count' e 'page'
+    const fullEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}count=${pageSize}&page=${page}`;
     
     onProgress?.(page, maxPages, `Coletando página ${page}... (${allData.length} registros)`);
     console.log(`📄 [COLETA] Página ${page}/${maxPages}: ${fullEndpoint}`);
@@ -66,14 +67,14 @@ export const fetchAllDataUnlimited = async (
       page++;
       
       // Pausa otimizada para evitar rate limit
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error: any) {
       console.error(`❌ [COLETA] Erro na página ${page}:`, error);
       
       if (error.message?.includes('429') || error.message?.includes('rate') || error.message?.includes('Limite')) {
-        console.log(`📄 [RATE_LIMIT] Aguardando 3s...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log(`📄 [RATE_LIMIT] Aguardando 5s...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
         continue; // Tentar a mesma página novamente
       }
       
@@ -90,12 +91,12 @@ export const fetchAllDataUnlimited = async (
   return allData;
 };
 
-// Função MASSIVA para buscar TODAS as charges (ch_) com filtros de data corretos
+// Função MASSIVA para buscar TODOS os payables (recebíveis) - ENDPOINT CORRETO
 export const fetchAllData = async (
   apiKey: string, 
   onProgress?: (stage: string, current: number, total: number, info: string) => void
 ) => {
-  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE CHARGES (ch_) com filtros de data...');
+  console.log('🚀 [MASTER] Iniciando COLETA MASSIVA DE PAYABLES (recebíveis) - ENDPOINT CORRETO...');
   
   // Período estendido de 36 meses para capturar TODOS os dados históricos
   const thirtyFiveMonthsAgo = new Date();
@@ -109,42 +110,37 @@ export const fetchAllData = async (
   console.log(`📅 [MASTER] Período: ${createdSince} até ${createdUntil} (36 meses)`);
   
   try {
-    // FASE 1: Coleta MASSIVA focada SOMENTE em charges com filtros de data
-    console.log('🚀 [FASE 1] Iniciando coleta massiva de charges com filtros de data...');
-    onProgress?.('Coletando charges', 1, 2, 'Iniciando coleta de todas as charges...');
+    // FASE 1: Coleta MASSIVA usando ENDPOINT CORRETO de payables
+    console.log('🚀 [FASE 1] Iniciando coleta massiva de payables (recebíveis)...');
+    onProgress?.('Coletando payables', 1, 2, 'Iniciando coleta de todos os recebíveis...');
     
-    // Usar filtros corretos de data para payables/charges
-    const chargesEndpoint = `/core/v5/charges?created_since=${createdSince}&created_until=${createdUntil}`;
+    // USAR ENDPOINT CORRETO DE PAYABLES com filtros de data
+    const payablesEndpoint = `/core/v5/payables?created_since=${createdSince}&created_until=${createdUntil}`;
     
-    console.log(`📡 [ENDPOINT] ${chargesEndpoint}`);
+    console.log(`📡 [ENDPOINT CORRETO] ${payablesEndpoint}`);
     
-    const chargesData = await fetchAllDataUnlimited(chargesEndpoint, apiKey, (current, total, info) => {
-      onProgress?.('Coletando charges', 1, 2, `Charges: ${info}`);
+    const payablesData = await fetchAllDataUnlimited(payablesEndpoint, apiKey, (current, total, info) => {
+      onProgress?.('Coletando payables', 1, 2, `Payables: ${info}`);
     });
     
-    console.log(`📊 [FASE 1] Coleta de charges completa: ${chargesData.length} charges`);
+    console.log(`📊 [FASE 1] Coleta de payables completa: ${payablesData.length} payables`);
     
-    // FASE 2: Filtrar somente charges que começam com 'ch_'
-    console.log('🚀 [FASE 2] Filtrando charges válidas (ch_)...');
-    onProgress?.('Processando dados', 2, 2, 'Filtrando charges válidas...');
-    
-    const validCharges = chargesData.filter(charge => 
-      charge.id && charge.id.startsWith('ch_')
-    );
+    // FASE 2: Processar dados recebidos
+    console.log('🚀 [FASE 2] Processando payables recebidos...');
+    onProgress?.('Processando dados', 2, 2, 'Processando recebíveis...');
     
     const finalStats = {
-      totalCharges: chargesData.length,
-      validCharges: validCharges.length,
-      filtered: chargesData.length - validCharges.length
+      totalPayables: payablesData.length,
+      filteredPayables: payablesData.length
     };
     
     console.log(`🎯 [MASTER] COLETA FINALIZADA:`, finalStats);
-    console.log(`📋 [SAMPLE] Amostra de charge:`, validCharges[0]);
+    console.log(`📋 [SAMPLE] Amostra de payable:`, payablesData[0]);
     
-    onProgress?.('Concluído', 2, 2, `${finalStats.validCharges} charges válidas coletadas!`);
+    onProgress?.('Concluído', 2, 2, `${finalStats.totalPayables} recebíveis coletados!`);
 
     return {
-      payablesData: validCharges, // Somente charges válidas
+      payablesData: payablesData, // Todos os payables
       transactionsData: [], // Removido transações
       ordersData: [] // Removido orders
     };

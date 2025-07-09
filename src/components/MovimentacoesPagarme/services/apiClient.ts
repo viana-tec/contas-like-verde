@@ -1,7 +1,7 @@
-
 /**
  * Core API client for Pagar.me communication
  * Handles request lifecycle, caching, and retry logic
+ * CORRIGIDO PARA PAYABLES
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -51,7 +51,7 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
       
       // Retry para rate limit
       if ((data.error.includes('429') || data.error.includes('rate') || data.error.includes('Limite')) && retryCount < 3) {
-        const delay = Math.pow(2, retryCount) * 2000; // Backoff exponencial
+        const delay = Math.pow(2, retryCount) * 3000; // Backoff exponencial maior
         console.log(`⏳ [RETRY] Aguardando ${delay}ms antes da tentativa ${retryCount + 2}...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return makeApiRequest(endpoint, apiKey, retryCount + 1);
@@ -72,7 +72,7 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
     
   } catch (error: any) {
     if (retryCount < 2 && !error.message?.includes('inválida')) {
-      const delay = 1000 * (retryCount + 1);
+      const delay = 2000 * (retryCount + 1);
       console.log(`🔄 [RETRY] Tentando novamente em ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return makeApiRequest(endpoint, apiKey, retryCount + 1);
@@ -83,11 +83,11 @@ export const makeApiRequest = async (endpoint: string, apiKey: string, retryCoun
   }
 };
 
-// Função para testar conexão - API v5
+// Função para testar conexão - API v5 CORRIGIDA PARA PAYABLES
 export const testConnection = async (apiKey: string): Promise<void> => {
-  console.log('🔄 [TESTE] Testando conexão...');
-  const data = await makeApiRequest('/core/v5/orders?size=5', apiKey);
-  console.log('✅ [TESTE] Conexão OK:', data);
+  console.log('🔄 [TESTE] Testando conexão com endpoint de payables...');
+  const data = await makeApiRequest('/core/v5/payables?count=5', apiKey);
+  console.log('✅ [TESTE] Conexão OK com payables:', data);
 };
 
 // Função para buscar detalhes de uma transação específica - API v5 CORRIGIDA

@@ -11,7 +11,7 @@ import type { TablesInsert } from '@/integrations/supabase/types';
 interface AccountPayableFormProps {
   onSubmit: (account: TablesInsert<'accounts_payable'>) => Promise<void>;
   onCancel: () => void;
-  initialData?: Partial<TablesInsert<'accounts_payable'>>;
+  initialData?: Partial<TablesInsert<'accounts_payable'> & { has_boleto?: boolean }>;
 }
 
 export const AccountPayableForm: React.FC<AccountPayableFormProps> = ({
@@ -47,8 +47,7 @@ export const AccountPayableForm: React.FC<AccountPayableFormProps> = ({
         category: formData.category || null,
         status: formData.status,
         notes: formData.notes || null,
-        has_boleto: formData.has_boleto,
-      });
+      } as TablesInsert<'accounts_payable'>);
       onCancel();
     } catch (error) {
       console.error('Error submitting form:', error);

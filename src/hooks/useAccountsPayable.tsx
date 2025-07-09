@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
-type AccountPayable = Tables<'accounts_payable'>;
+type AccountPayable = Tables<'accounts_payable'> & { has_boleto?: boolean };
 type AccountPayableInsert = TablesInsert<'accounts_payable'>;
 type AccountPayableUpdate = TablesUpdate<'accounts_payable'>;
 
@@ -35,7 +35,7 @@ export const useAccountsPayable = () => {
     }
   };
 
-  const addAccount = async (account: AccountPayableInsert) => {
+  const addAccount = async (account: AccountPayableInsert): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from('accounts_payable')
@@ -50,7 +50,6 @@ export const useAccountsPayable = () => {
         title: 'Sucesso',
         description: 'Conta adicionada com sucesso',
       });
-      return data;
     } catch (error) {
       console.error('Error adding account:', error);
       toast({
@@ -62,7 +61,7 @@ export const useAccountsPayable = () => {
     }
   };
 
-  const updateAccount = async (id: string, updates: AccountPayableUpdate) => {
+  const updateAccount = async (id: string, updates: AccountPayableUpdate): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from('accounts_payable')
@@ -78,7 +77,6 @@ export const useAccountsPayable = () => {
         title: 'Sucesso',
         description: 'Conta atualizada com sucesso',
       });
-      return data;
     } catch (error) {
       console.error('Error updating account:', error);
       toast({
@@ -90,7 +88,7 @@ export const useAccountsPayable = () => {
     }
   };
 
-  const deleteAccount = async (id: string) => {
+  const deleteAccount = async (id: string): Promise<void> => {
     try {
       const { error } = await supabase
         .from('accounts_payable')

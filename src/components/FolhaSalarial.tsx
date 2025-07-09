@@ -1,115 +1,68 @@
 
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Download, FileSpreadsheet, Users } from 'lucide-react';
+import { Plus, Edit3, Trash2, Download, FileSpreadsheet, Users, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-
-interface FuncionarioData {
-  id: string;
-  nome: string;
-  funcao: string;
-  salario: string;
-  diaPagamento1: number;
-  diaPagamento2: number;
-  chavePix: string;
-  criadoEm: string;
-}
+import { useCltEmployees } from '@/hooks/useCltEmployees';
+import { useServiceProviders } from '@/hooks/useServiceProviders';
+import { CltEmployeeForm } from './CltEmployeeForm';
+import { ServiceProviderForm } from './ServiceProviderForm';
+import type { Tables } from '@/integrations/supabase/types';
 
 export const FolhaSalarial: React.FC = () => {
-  const [funcionarios, setFuncionarios] = useState<FuncionarioData[]>([
-    {
-      id: '1',
-      nome: 'João Silva',
-      funcao: 'Desenvolvedor Sênior',
-      salario: '8500.00',
-      diaPagamento1: 15,
-      diaPagamento2: 30,
-      chavePix: 'joao.silva@email.com',
-      criadoEm: '2024-01-15'
-    },
-    {
-      id: '2',
-      nome: 'Maria Santos',
-      funcao: 'Gerente Financeiro',
-      salario: '12000.00',
-      diaPagamento1: 10,
-      diaPagamento2: 25,
-      chavePix: '+5511999999999',
-      criadoEm: '2024-01-20'
-    }
-  ]);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingFuncionario, setEditingFuncionario] = useState<FuncionarioData | null>(null);
-  const [formData, setFormData] = useState<Partial<FuncionarioData>>({});
+  const { employees, loading: loadingEmployees, addEmployee, updateEmployee, deleteEmployee } = useCltEmployees();
+  const { providers, loading: loadingProviders, addProvider, updateProvider, deleteProvider } = useServiceProviders();
+  
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('clt');
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Tables<'clt_employees'> | null>(null);
+  const [editingProvider, setEditingProvider] = useState<Tables<'service_providers'> | null>(null);
+  const [copiedPix, setCopiedPix] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleOpenModal = (funcionario?: FuncionarioData) => {
-    if (funcionario) {
-      setEditingFuncionario(funcionario);
-      setFormData(funcionario);
-    } else {
-      setEditingFuncionario(null);
-      setFormData({});
-    }
-    setIsModalOpen(true);
+  const handleOpenEmployeeModal = (employee?: Tables<'clt_employees'>) => {
+    setEditingEmployee(employee || null);
+    setIsEmployeeModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.nome || !formData.funcao || !formData.salario) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos obrigatórios.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (editingFuncionario) {
-      // Update existing
-      setFuncionarios(prev => 
-        prev.map(f => f.id === editingFuncionario.id ? { ...f, ...formData } as FuncionarioData : f)
-      );
-      toast({
-        title: "Sucesso",
-        description: "Funcionário atualizado com sucesso!",
-      });
-    } else {
-      // Create new
-      const newFuncionario: FuncionarioData = {
-        id: Date.now().toString(),
-        nome: formData.nome || '',
-        funcao: formData.funcao || '',
-        salario: formData.salario || '',
-        diaPagamento1: formData.diaPagamento1 || 15,
-        diaPagamento2: formData.diaPagamento2 || 30,
-        chavePix: formData.chavePix || '',
-        criadoEm: new Date().toISOString()
-      };
-      setFuncionarios(prev => [...prev, newFuncionario]);
-      toast({
-        title: "Sucesso",
-        description: "Funcionário adicionado com sucesso!",
-      });
-    }
-
-    setIsModalOpen(false);
-    setFormData({});
-    setEditingFuncionario(null);
+  const handleOpenProviderModal = (provider?: Tables<'service_providers'>) => {
+    setEditingProvider(provider || null);
+    setIsProviderModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setFuncionarios(prev => prev.filter(f => f.id !== id));
-    toast({
-      title: "Sucesso",
-      description: "Funcionário removido com sucesso!",
-    });
+  const handleEmployeeSubmit = async (employeeData: any) => {
+    if (editingEmployee) {
+      await updateEmployee(editingEmployee.id, employeeData);
+    } else {
+      await addEmployee(employeeData);
+    }
+    setIsEmployeeModalOpen(false);
+    setEditingEmployee(null);
+  };
+
+  const handleProviderSubmit = async (providerData: any) => {
+    if (editingProvider) {
+      await updateProvider(editingProvider.id, providerData);
+    } else {
+      await addProvider(providerData);
+    }
+    setIsProviderModalOpen(false);
+    setEditingProvider(null);
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    deleteEmployee(id);
+  };
+
+  const handleDeleteProvider = (id: string) => {
+    deleteProvider(id);
   };
 
   const handleExportPDF = () => {
@@ -126,24 +79,53 @@ export const FolhaSalarial: React.FC = () => {
     });
   };
 
-  const formatCurrency = (value: string) => {
+  const copyPixKey = async (pixKey: string) => {
+    try {
+      await navigator.clipboard.writeText(pixKey);
+      setCopiedPix(pixKey);
+      toast({
+        title: "Copiado!",
+        description: "Chave PIX copiada para a área de transferência",
+      });
+      setTimeout(() => setCopiedPix(null), 2000);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível copiar a chave PIX",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    }).format(parseFloat(value));
+    }).format(value);
   };
 
-  const filteredFuncionarios = funcionarios.filter(funcionario =>
-    funcionario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    funcionario.funcao.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredEmployees = employees.filter(employee =>
+    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.position.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredProviders = providers.filter(provider =>
+    provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    provider.service_type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalEmployeesPayroll = employees.reduce((sum, emp) => 
+    sum + emp.base_salary - (emp.salary_advance || 0) - (emp.discounts || 0) + (emp.bonuses || 0), 0
+  );
+
+  const totalProvidersPayroll = providers.reduce((sum, prov) => sum + prov.monthly_amount, 0);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-3">
           <Users className="h-8 w-8 text-[#39FF14]" />
-          <h1 className="text-3xl font-bold">Folha Salarial</h1>
+          <h1 className="text-3xl font-bold text-white">Folha Salarial</h1>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleExportPDF}>
@@ -154,181 +136,263 @@ export const FolhaSalarial: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Excel
           </Button>
-          <Button 
-            onClick={() => handleOpenModal()}
-            className="bg-[#39FF14] text-black hover:bg-[#39FF14]/90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Funcionário
-          </Button>
         </div>
       </div>
 
-      {/* Search and Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 md:col-span-2 bg-gray-900 border-gray-800">
-          <Label htmlFor="search">Buscar Funcionário</Label>
-          <Input
-            id="search"
-            placeholder="Nome ou função..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </Card>
-        <Card className="p-4 bg-gray-900 border-gray-800">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[#39FF14]">{funcionarios.length}</div>
-            <div className="text-sm text-gray-400">Total de Funcionários</div>
-          </div>
-        </Card>
-        <Card className="p-4 bg-gray-900 border-gray-800">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[#39FF14]">
-              {formatCurrency(funcionarios.reduce((sum, f) => sum + parseFloat(f.salario), 0).toString())}
-            </div>
-            <div className="text-sm text-gray-400">Folha Total</div>
-          </div>
-        </Card>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="clt" className="text-white">Funcionários CLT</TabsTrigger>
+          <TabsTrigger value="providers" className="text-white">Prestadores de Serviços</TabsTrigger>
+        </TabsList>
 
-      {/* Table */}
-      <Card className="bg-gray-900 border-gray-800">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Função</TableHead>
-              <TableHead>Salário</TableHead>
-              <TableHead>1º Pagamento</TableHead>
-              <TableHead>2º Pagamento</TableHead>
-              <TableHead>Chave PIX</TableHead>
-              <TableHead>Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredFuncionarios.map((funcionario) => (
-              <TableRow key={funcionario.id}>
-                <TableCell className="font-medium">{funcionario.nome}</TableCell>
-                <TableCell>{funcionario.funcao}</TableCell>
-                <TableCell className="text-[#39FF14] font-bold">
-                  {formatCurrency(funcionario.salario)}
-                </TableCell>
-                <TableCell>Dia {funcionario.diaPagamento1}</TableCell>
-                <TableCell>Dia {funcionario.diaPagamento2}</TableCell>
-                <TableCell className="text-sm text-gray-400">{funcionario.chavePix}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-1">
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => handleOpenModal(funcionario)}
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => handleDelete(funcionario.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-
-      {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingFuncionario ? 'Editar Funcionário' : 'Novo Funcionário'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="nome">Nome *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-                  placeholder="Nome completo"
-                />
-              </div>
-              <div>
-                <Label htmlFor="funcao">Função *</Label>
-                <Input
-                  id="funcao"
-                  value={formData.funcao || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, funcao: e.target.value }))}
-                  placeholder="Cargo ou função"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="salario">Salário *</Label>
-                <Input
-                  id="salario"
-                  type="number"
-                  step="0.01"
-                  value={formData.salario || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, salario: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="dia1">1º Pagamento</Label>
-                <Input
-                  id="dia1"
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={formData.diaPagamento1 || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, diaPagamento1: parseInt(e.target.value) }))}
-                  placeholder="15"
-                />
-              </div>
-              <div>
-                <Label htmlFor="dia2">2º Pagamento</Label>
-                <Input
-                  id="dia2"
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={formData.diaPagamento2 || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, diaPagamento2: parseInt(e.target.value) }))}
-                  placeholder="30"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="chavePix">Chave PIX</Label>
+        <TabsContent value="clt" className="space-y-4">
+          {/* Search and Stats for CLT */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="p-4 md:col-span-2 bg-gray-900 border-gray-800">
+              <Label htmlFor="search-clt" className="text-white">Buscar Funcionário CLT</Label>
               <Input
-                id="chavePix"
-                value={formData.chavePix || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, chavePix: e.target.value }))}
-                placeholder="CPF, email, telefone ou chave aleatória"
+                id="search-clt"
+                placeholder="Nome ou cargo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="text-white"
               />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleSave}
-                className="bg-[#39FF14] text-black hover:bg-[#39FF14]/90"
-              >
-                {editingFuncionario ? 'Atualizar' : 'Salvar'}
-              </Button>
-            </div>
+            </Card>
+            <Card className="p-4 bg-gray-900 border-gray-800">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#39FF14]">{employees.length}</div>
+                <div className="text-sm text-gray-400">Total CLT</div>
+              </div>
+            </Card>
+            <Card className="p-4 bg-gray-900 border-gray-800">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#39FF14]">
+                  {formatCurrency(totalEmployeesPayroll)}
+                </div>
+                <div className="text-sm text-gray-400">Folha CLT</div>
+              </div>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => handleOpenEmployeeModal()}
+              className="bg-[#39FF14] text-black hover:bg-[#39FF14]/90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Funcionário CLT
+            </Button>
+          </div>
+
+          {/* CLT Table */}
+          <Card className="bg-gray-900 border-gray-800">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-white font-bold">Nome</TableHead>
+                  <TableHead className="text-white font-bold">Cargo</TableHead>
+                  <TableHead className="text-white font-bold">Salário Base</TableHead>
+                  <TableHead className="text-white font-bold">Vale</TableHead>
+                  <TableHead className="text-white font-bold">Descontos</TableHead>
+                  <TableHead className="text-white font-bold">Líquido</TableHead>
+                  <TableHead className="text-white font-bold">Chave PIX</TableHead>
+                  <TableHead className="text-white font-bold">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredEmployees.map((employee) => {
+                  const liquidValue = employee.base_salary - (employee.salary_advance || 0) - (employee.discounts || 0) + (employee.bonuses || 0);
+                  return (
+                    <TableRow key={employee.id}>
+                      <TableCell className="font-bold text-white">{employee.name}</TableCell>
+                      <TableCell className="text-white font-bold">{employee.position}</TableCell>
+                      <TableCell className="text-[#39FF14] font-bold">
+                        {formatCurrency(employee.base_salary)}
+                      </TableCell>
+                      <TableCell className="text-white font-bold">
+                        {formatCurrency(employee.salary_advance || 0)}
+                      </TableCell>
+                      <TableCell className="text-white font-bold">
+                        {formatCurrency(employee.discounts || 0)}
+                      </TableCell>
+                      <TableCell className="text-[#39FF14] font-bold">
+                        {formatCurrency(liquidValue)}
+                      </TableCell>
+                      <TableCell className="text-white font-bold">
+                        {employee.pix_key && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-400 truncate max-w-[100px]">
+                              {employee.pix_key}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyPixKey(employee.pix_key!)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {copiedPix === employee.pix_key ? (
+                                <Check className="h-3 w-3 text-green-500" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleOpenEmployeeModal(employee)}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleDeleteEmployee(employee.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="providers" className="space-y-4">
+          {/* Search and Stats for Providers */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="p-4 md:col-span-2 bg-gray-900 border-gray-800">
+              <Label htmlFor="search-providers" className="text-white">Buscar Prestador</Label>
+              <Input
+                id="search-providers"
+                placeholder="Nome ou tipo de serviço..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="text-white"
+              />
+            </Card>
+            <Card className="p-4 bg-gray-900 border-gray-800">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#39FF14]">{providers.length}</div>
+                <div className="text-sm text-gray-400">Total Prestadores</div>
+              </div>
+            </Card>
+            <Card className="p-4 bg-gray-900 border-gray-800">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-[#39FF14]">
+                  {formatCurrency(totalProvidersPayroll)}
+                </div>
+                <div className="text-sm text-gray-400">Folha Prestadores</div>
+              </div>
+            </Card>
+          </div>
+
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => handleOpenProviderModal()}
+              className="bg-[#39FF14] text-black hover:bg-[#39FF14]/90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Prestador de Serviços
+            </Button>
+          </div>
+
+          {/* Providers Table */}
+          <Card className="bg-gray-900 border-gray-800">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-white font-bold">Nome</TableHead>
+                  <TableHead className="text-white font-bold">Tipo de Serviço</TableHead>
+                  <TableHead className="text-white font-bold">Valor Mensal</TableHead>
+                  <TableHead className="text-white font-bold">Dia Pagamento</TableHead>
+                  <TableHead className="text-white font-bold">Chave PIX</TableHead>
+                  <TableHead className="text-white font-bold">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProviders.map((provider) => (
+                  <TableRow key={provider.id}>
+                    <TableCell className="font-bold text-white">{provider.name}</TableCell>
+                    <TableCell className="text-white font-bold">{provider.service_type}</TableCell>
+                    <TableCell className="text-[#39FF14] font-bold">
+                      {formatCurrency(provider.monthly_amount)}
+                    </TableCell>
+                    <TableCell className="text-white font-bold">Dia {provider.payment_date}</TableCell>
+                    <TableCell className="text-white font-bold">
+                      {provider.pix_key && (
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-400 truncate max-w-[100px]">
+                            {provider.pix_key}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyPixKey(provider.pix_key!)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {copiedPix === provider.pix_key ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleOpenProviderModal(provider)}
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleDeleteProvider(provider.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modals */}
+      <CltEmployeeForm
+        isOpen={isEmployeeModalOpen}
+        onSubmit={handleEmployeeSubmit}
+        onCancel={() => {
+          setIsEmployeeModalOpen(false);
+          setEditingEmployee(null);
+        }}
+        initialData={editingEmployee || undefined}
+      />
+
+      <ServiceProviderForm
+        isOpen={isProviderModalOpen}
+        onSubmit={handleProviderSubmit}
+        onCancel={() => {
+          setIsProviderModalOpen(false);
+          setEditingProvider(null);
+        }}
+        initialData={editingProvider || undefined}
+      />
     </div>
   );
 };

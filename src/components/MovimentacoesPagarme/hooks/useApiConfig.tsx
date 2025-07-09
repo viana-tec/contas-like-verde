@@ -20,6 +20,21 @@ export const useApiConfig = () => {
     loadApiConfig();
   }, []);
 
+  const refreshSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('❌ [AUTH] Erro ao renovar sessão:', error);
+        return false;
+      }
+      console.log('✅ [AUTH] Sessão renovada com sucesso');
+      return true;
+    } catch (error) {
+      console.error('❌ [AUTH] Erro crítico ao renovar sessão:', error);
+      return false;
+    }
+  };
+
   const loadApiConfig = async () => {
     try {
       const { data, error } = await supabase
@@ -27,9 +42,9 @@ export const useApiConfig = () => {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      if (error) {
         console.error('❌ [CONFIG] Erro ao carregar configuração:', error);
         return;
       }
@@ -69,16 +84,47 @@ export const useApiConfig = () => {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from('pagarme_api_config')
         .upsert(configData, {
           onConflict: 'api_key',
           ignoreDuplicates: false
         });
 
+      // Se o erro for relacionado a JWT expirado, tenta renovar a sessão
+      if (error && (error.message.includes('JWT') || error.message.includes('expired'))) {
+        console.log('🔄 [AUTH] Token expirado, tentando renovar sessão...');
+        
+        const sessionRefreshed = await refreshSession();
+        
+        if (sessionRefreshed) {
+          // Tenta novamente após renovar a sessão
+          const result = await supabase
+            .from('pagarme_api_config')
+            .upsert(configData, {
+              onConflict: 'api_key',
+              ignoreDuplicates: false
+            });
+          
+          error = result.error;
+        }
+      }
+
       if (error) {
         console.error('❌ [CONFIG] Erro ao salvar configuração:', error);
-        throw new Error(`Erro ao salvar configuração: ${error.message}`);
+        
+        // Tratamento específico para diferentes tipos de erro
+        let errorMessage = 'Erro desconhecido';
+        
+        if (error.message.includes('JWT') || error.message.includes('expired')) {
+          errorMessage = 'Sessão expirada. Recarregue a página e tente novamente.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'Sem permissão para salvar configuração.';
+        } else {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       // Salvar também no localStorage

@@ -113,27 +113,36 @@ export const calculateFinancialIndicators = (
     sampleTransaction: transactions[0]
   });
   
-  // CORREÇÃO: Usar operações PAGAS para receita (mais precisas que transações)
-  const paidOperations = operations.filter(op => 
-    op.status === 'paid' || op.status === 'available' || op.status === 'transferred'
-  );
-  console.log('💰 [INDICADORES] Operações pagas:', paidOperations.length);
+  // CORREÇÃO: Incluir operações de cartão pendente nos cálculos de receita
+  const revenueOperations = operations.filter(op => {
+    // Incluir operações pagas E operações de cartão pendente
+    const isPaid = op.status === 'paid' || op.status === 'available' || op.status === 'transferred';
+    const isPendingCard = (op.status === 'pending' || op.status === 'pending_payment' || op.status === 'waiting_payment') && 
+                         op.payment_method === 'credit_card';
+    return isPaid || isPendingCard;
+  });
   
-  // Calcular receita baseada em operações (mais preciso)
-  const totalRevenue = paidOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
-  const totalFees = paidOperations.reduce((sum, op) => sum + (op.fee || 0), 0);
+  console.log('💰 [INDICADORES] Operações para receita:', {
+    total: revenueOperations.length,
+    paid: revenueOperations.filter(op => op.status === 'paid' || op.status === 'available' || op.status === 'transferred').length,
+    pendingCard: revenueOperations.filter(op => (op.status === 'pending' || op.status === 'pending_payment' || op.status === 'waiting_payment') && op.payment_method === 'credit_card').length
+  });
+  
+  // Calcular receita baseada em operações (incluindo cartão pendente)
+  const totalRevenue = revenueOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
+  const totalFees = revenueOperations.reduce((sum, op) => sum + (op.fee || 0), 0);
   const netRevenue = totalRevenue - totalFees;
   
   // Total de transações (incluindo todas, não apenas pagas)
   const totalTransactions = Math.max(operations.length, transactions.length);
   
-  console.log('💰 [INDICADORES] Receitas:', { totalRevenue, totalFees, netRevenue });
+  console.log('💰 [INDICADORES] Receitas (incluindo cartão pendente):', { totalRevenue, totalFees, netRevenue });
   
-  // CORREÇÃO: Usar operações pagas para cálculos por método (mais preciso)
-  const pixOperations = paidOperations.filter(op => op.payment_method === 'pix');
-  const cardOperations = paidOperations.filter(op => op.payment_method === 'credit_card');
-  const debitOperations = paidOperations.filter(op => op.payment_method === 'debit_card');
-  const boletoOperations = paidOperations.filter(op => op.payment_method === 'boleto');
+  // CORREÇÃO: Usar operações de receita para cálculos por método (incluindo cartão pendente)
+  const pixOperations = revenueOperations.filter(op => op.payment_method === 'pix');
+  const cardOperations = revenueOperations.filter(op => op.payment_method === 'credit_card');
+  const debitOperations = revenueOperations.filter(op => op.payment_method === 'debit_card');
+  const boletoOperations = revenueOperations.filter(op => op.payment_method === 'boleto');
   
   const pixRevenue = pixOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   const cardRevenue = cardOperations.reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
@@ -152,14 +161,14 @@ export const calculateFinancialIndicators = (
   const refundedOperations = operations.filter(op => op.status === 'refunded' || op.type === 'refund');
   const refundRate = operations.length > 0 ? (refundedOperations.length / operations.length) * 100 : 0;
   
-  // Receita de hoje (apenas operações pagas)
+  // Receita de hoje (incluindo cartão pendente)
   const today = new Date();
-  const todayRevenue = paidOperations
+  const todayRevenue = revenueOperations
     .filter(op => isToday(op.created_at))
     .reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   
-  // Receita do mês (apenas operações pagas)
-  const monthRevenue = paidOperations
+  // Receita do mês (incluindo cartão pendente)
+  const monthRevenue = revenueOperations
     .filter(op => isThisMonth(op.created_at))
     .reduce((sum, op) => sum + Math.abs(op.amount || 0), 0);
   

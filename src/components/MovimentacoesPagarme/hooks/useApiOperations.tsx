@@ -1,7 +1,7 @@
 
 /**
  * Hook para operações da API Pagar.me
- * VERSÃO OTIMIZADA COM ARMAZENAMENTO NO BANCO
+ * VERSÃO OTIMIZADA COM PROGRESSO DETALHADO
  */
 
 import { useToast } from '@/hooks/use-toast';
@@ -11,7 +11,6 @@ import { validateApiKey, mapOrdersToOperations, mapTransactions, mapPayablesToOp
 import { testConnection, fetchAllData } from '../services/pagarmeService';
 import { mergeOperationsWithoutDuplicates } from '../utils/operationMerger';
 import { deduplicateOperations, validateOperationIntegrity } from '../utils/operationDeduplicator';
-import { saveOperationsToDatabase, getStoredOperations } from '../services/operationsStorage';
 import { useState } from 'react';
 
 interface UseApiOperationsProps {
@@ -23,7 +22,6 @@ interface UseApiOperationsProps {
   setLoading: (loading: boolean) => void;
   setConnectionStatus: (status: any) => void;
   setErrorDetails: (details: string) => void;
-  saveApiKey: () => Promise<void>;
 }
 
 export const useApiOperations = ({
@@ -34,8 +32,7 @@ export const useApiOperations = ({
   setPendingBalance,
   setLoading,
   setConnectionStatus,
-  setErrorDetails,
-  saveApiKey
+  setErrorDetails
 }: UseApiOperationsProps) => {
   const { toast } = useToast();
   
@@ -46,6 +43,35 @@ export const useApiOperations = ({
     total: number;
     info: string;
   } | null>(null);
+
+  const saveApiKey = () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira uma chave API.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateApiKey(apiKey)) {
+      toast({
+        title: "Formato inválido", 
+        description: "A chave da API deve ter pelo menos 10 caracteres válidos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    localStorage.setItem('pagarme_api_key', apiKey.trim());
+    setConnectionStatus('idle');
+    setErrorDetails('');
+    
+    toast({
+      title: "Chave API salva",
+      description: "A chave da API foi salva com sucesso.",
+    });
+  };
 
   const handleTestConnection = async () => {
     if (!apiKey?.trim()) {
@@ -68,19 +94,13 @@ export const useApiOperations = ({
 
     setConnectionStatus('connecting');
     setErrorDetails('');
-    setProgressInfo({ stage: 'Testando conexão', current: 1, total: 3, info: 'Verificando API...' });
+    setProgressInfo({ stage: 'Testando conexão', current: 1, total: 2, info: 'Verificando API...' });
     
     try {
-      // Testar conexão
       await testConnection(apiKey);
       
-      setProgressInfo({ stage: 'Salvando configuração', current: 2, total: 3, info: 'Salvando chave API...' });
-      
-      // Salvar a chave API no banco
-      await saveApiKey();
-      
       setConnectionStatus('connected');
-      setProgressInfo({ stage: 'Finalizado', current: 3, total: 3, info: 'Conexão estabelecida!' });
+      setProgressInfo(null);
       
       toast({
         title: "Conexão estabelecida",
@@ -132,30 +152,6 @@ export const useApiOperations = ({
     }
   };
 
-  const loadStoredOperations = async () => {
-    try {
-      setProgressInfo({ stage: 'Carregando dados salvos', current: 1, total: 1, info: 'Buscando operações...' });
-      
-      const storedOperations = await getStoredOperations();
-      setOperations(storedOperations);
-      
-      setProgressInfo(null);
-      
-      if (storedOperations.length > 0) {
-        toast({
-          title: "Dados carregados",
-          description: `${storedOperations.length} operações carregadas do banco de dados.`,
-        });
-      }
-      
-      return storedOperations.length > 0;
-    } catch (error: any) {
-      console.error('❌ [STORAGE] Erro ao carregar dados salvos:', error);
-      setProgressInfo(null);
-      return false;
-    }
-  };
-
   const fetchData = async () => {
     if (!apiKey?.trim() || !validateApiKey(apiKey)) {
       toast({
@@ -168,12 +164,12 @@ export const useApiOperations = ({
 
     setLoading(true);
     setErrorDetails('');
-    setProgressInfo({ stage: 'Iniciando coleta', current: 0, total: 5, info: 'Preparando...' });
+    setProgressInfo({ stage: 'Iniciando coleta', current: 0, total: 4, info: 'Preparando...' });
     
     try {
       // Função de callback para atualizar progresso
       const onProgress = (stage: string, current: number, total: number, info: string) => {
-        setProgressInfo({ stage, current: current + 1, total: 5, info });
+        setProgressInfo({ stage, current, total, info });
       };
 
       const { ordersData, transactionsData, balanceData, payablesData } = await fetchAllData(apiKey, onProgress);
@@ -185,7 +181,7 @@ export const useApiOperations = ({
         balance: balanceData
       });
       
-      setProgressInfo({ stage: 'Processando dados', current: 4, total: 5, info: 'Formatando operações...' });
+      setProgressInfo({ stage: 'Processando dados', current: 4, total: 4, info: 'Formatando operações...' });
       
       // Mapear orders para operações E payables para operações também 
       const orderOperations = mapOrdersToOperations(ordersData);
@@ -206,24 +202,13 @@ export const useApiOperations = ({
       // Converter transações
       const formattedTransactions = mapTransactions(transactionsData);
       
-      // SALVAR OPERAÇÕES NO BANCO DE DADOS
-      setProgressInfo({ stage: 'Salvando no banco', current: 5, total: 5, info: 'Armazenando operações...' });
-      
-      try {
-        await saveOperationsToDatabase(allOperations);
-        console.log(`💾 [STORAGE] Operações salvas no banco com sucesso!`);
-      } catch (storageError: any) {
-        console.warn('⚠️ [STORAGE] Erro ao salvar no banco:', storageError);
-        // Continuar mesmo se falhar o armazenamento
-      }
-      
       // Atualizar estados
       setOperations(allOperations);
       setTransactions(formattedTransactions);
       setAvailableBalance(balanceData.available);
       setPendingBalance(balanceData.pending);
       
-      console.log(`🎯 [FRONTEND] DADOS PROCESSADOS E SALVOS COM SUCESSO:`, {
+      console.log(`🎯 [FRONTEND] DADOS PROCESSADOS COM SUCESSO:`, {
         totalOperations: allOperations.length,
         orderOperations: orderOperations.length,
         payableOperations: payableOperations.length,
@@ -237,8 +222,8 @@ export const useApiOperations = ({
       setProgressInfo(null);
       
       toast({
-        title: "🎉 Dados coletados e salvos!",
-        description: `${allOperations.length} operações coletadas e armazenadas no banco!`,
+        title: "🎉 Dados carregados com sucesso!",
+        description: `${allOperations.length} operações e ${formattedTransactions.length} transações coletadas!`,
       });
       
     } catch (error: any) {
@@ -258,10 +243,10 @@ export const useApiOperations = ({
   };
 
   return {
+    saveApiKey,
     testConnection: handleTestConnection,
     loadDemoData,
     fetchData,
-    loadStoredOperations,
     progressInfo
   };
 };

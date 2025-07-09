@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { ApiConfiguration } from './ApiConfiguration';
@@ -11,6 +11,7 @@ import { OperationsTable } from './OperationsTable';
 import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { BalanceCards } from './BalanceCards';
+import { ApiDiagnostics } from './ApiDiagnostics';
 import { usePagarmeApi } from './hooks/usePagarmeApi';
 
 export const MovimentacoesPagarme = () => {
@@ -38,21 +39,8 @@ export const MovimentacoesPagarme = () => {
     saveApiKey,
     testConnection,
     loadDemoData,
-    fetchData,
-    loadStoredOperations
+    fetchData
   } = usePagarmeApi();
-
-  // Carregar dados salvos ao inicializar se tiver API key configurada
-  useEffect(() => {
-    const initializeData = async () => {
-      if (apiKey && connectionStatus === 'connected') {
-        console.log('🔄 Carregando dados salvos ao inicializar...');
-        await loadStoredOperations();
-      }
-    };
-    
-    initializeData();
-  }, [apiKey, connectionStatus]);
 
   return (
     <div className="space-y-6">
@@ -75,6 +63,12 @@ export const MovimentacoesPagarme = () => {
         loading={loading}
         onRefresh={fetchData}
         progressInfo={progressInfo}
+      />
+
+      <ApiDiagnostics
+        apiKey={apiKey}
+        totalOperations={operations.length}
+        totalTransactions={transactions.length}
       />
 
       {!apiKey && (

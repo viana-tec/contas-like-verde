@@ -12,6 +12,8 @@ import { TransactionsTable } from './TransactionsTable';
 import { EmptyState } from './EmptyState';
 import { BalanceCards } from './BalanceCards';
 import { ApiDiagnostics } from './ApiDiagnostics';
+import { StatusDiagnosticsPanel } from './StatusDiagnosticsPanel';
+import { SmartStatusSync } from './SmartStatusSync';
 import { usePagarmeApi } from './hooks/usePagarmeApi';
 
 export const MovimentacoesPagarme = () => {
@@ -105,6 +107,11 @@ export const MovimentacoesPagarme = () => {
           />
           
           <FinancialIndicators indicators={financialIndicators} isLoading={loading} />
+          
+          {/* Sistema de Diagnóstico e Correção Inteligente */}
+          <StatusDiagnosticsPanel onRefresh={fetchData} />
+          
+          <SmartStatusSync onRefresh={fetchData} />
           
           <FilterPanel
             filters={filters}

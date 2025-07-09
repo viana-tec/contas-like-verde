@@ -31,11 +31,42 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Set up automatic session refresh
+    const refreshInterval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.expires_at) {
+        const expiresAt = new Date(session.expires_at * 1000);
+        const now = new Date();
+        const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+        
+        // Refresh if expires in less than 5 minutes
+        if (timeUntilExpiry < 5 * 60 * 1000) {
+          console.log('🔄 Refreshing session...');
+          await supabase.auth.refreshSession();
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, []);
 
   const createProfile = async (user: User) => {
     try {
+      // Check if profile already exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        console.log('Profile already exists for user:', user.id);
+        return;
+      }
+
       const { error } = await supabase
         .from('profiles')
         .insert([

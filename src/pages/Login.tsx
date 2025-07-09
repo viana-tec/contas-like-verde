@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, User, Mail, Lock } from 'lucide-react';
+import { Loader2, Mail, Lock } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -86,8 +87,12 @@ const Login = () => {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-gray-900 border-gray-800">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-white flex items-center justify-center gap-2">
-            <User className="h-6 w-6 text-[#39FF14]" />
+          <CardTitle className="text-2xl font-bold text-white flex items-center justify-center gap-2 flex-col">
+            <img 
+              src="/lovable-uploads/ccbb80c9-03c4-4630-8c16-9889a9f6c1be.png" 
+              alt="Finance Logo" 
+              className="h-16 w-auto mb-2"
+            />
             Sistema Financeiro
           </CardTitle>
         </CardHeader>
@@ -151,7 +156,6 @@ const Login = () => {
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-gray-300 flex items-center gap-2">
-                    <User className="h-4 w-4" />
                     Nome Completo
                   </Label>
                   <Input

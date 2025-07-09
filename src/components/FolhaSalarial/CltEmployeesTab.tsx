@@ -65,7 +65,7 @@ export const CltEmployeesTab: React.FC<CltEmployeesTabProps> = ({
                   <TableCell className="text-[#39FF14] font-bold">
                     {formatCurrency(liquidValue)}
                   </TableCell>
-                  <TableCell className="text-white font-bold">
+                  <TableCell className="font-bold text-slate-50">
                     {employee.pix_key && <PixKeyCell pixKey={employee.pix_key} />}
                   </TableCell>
                   <TableCell>

@@ -6,7 +6,6 @@ export interface BalanceOperation {
   amount: number;
   fee?: number;
   created_at: string;
-  updated_at?: string;
   description?: string;
   // Campos expandidos
   payment_method?: string;

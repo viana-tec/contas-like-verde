@@ -13,13 +13,13 @@ export const usePagarmeApi = () => {
   const apiState = useApiState();
   
   // Filtros e dados filtrados
-  const filtersState = useFilters(apiState.operations);
+  const filtersState = useFilters(apiState.operations, apiState.transactions);
   
   // Operações da API
   const apiOperations = useApiOperations({
     apiKey: apiState.apiKey,
     setOperations: apiState.setOperations,
-    
+    setTransactions: apiState.setTransactions,
     setAvailableBalance: apiState.setAvailableBalance,
     setPendingBalance: apiState.setPendingBalance,
     setLoading: apiState.setLoading,
@@ -31,7 +31,7 @@ export const usePagarmeApi = () => {
     // Estado da API
     apiKey: apiState.apiKey,
     operations: filtersState.filteredOperations,
-    
+    transactions: filtersState.filteredTransactions,
     availableBalance: apiState.availableBalance,
     pendingBalance: apiState.pendingBalance,
     loading: apiState.loading,
@@ -50,7 +50,6 @@ export const usePagarmeApi = () => {
     testConnection: apiOperations.testConnection,
     loadDemoData: apiOperations.loadDemoData,
     fetchData: apiOperations.fetchData,
-    loadSavedData: apiOperations.loadSavedData,
     
     // Ações dos filtros
     setFiltersExpanded: filtersState.setFiltersExpanded,
